@@ -4,6 +4,8 @@ import type { Clip, ClipColor, ClipTransform, KfEasing, KfProp, MediaItem, Proje
 import { clipSpeed } from '../shared/types';
 import { getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
+import { getTemplate } from '../shared/templates';
+import { templateDefaults } from '../shared/template-api';
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
@@ -79,8 +81,10 @@ export function addTrack(p: Project, kind: TrackKind, atTop = false): { project:
   } else if (kind === 'video') {
     // pistas de vídeo ficam todas acima das de áudio
     const lastVideo = p.tracks.map((t) => t.kind).lastIndexOf('video');
+    const firstNonText = p.tracks.findIndex((t) => t.kind !== 'text');
     tracks = [...p.tracks];
-    tracks.splice(atTop ? 0 : lastVideo + 1, 0, track);
+    // "no topo" = logo abaixo das pistas de texto
+    tracks.splice(atTop ? (firstNonText < 0 ? p.tracks.length : firstNonText) : lastVideo + 1, 0, track);
   } else {
     tracks = [...p.tracks, track];
   }
@@ -177,8 +181,8 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const found = findClip(p, origin.id);
   if (!found) return p;
   const media = p.media.find((m) => m.id === origin.mediaId);
-  if (!media && !origin.text) return p;
-  const src = media ? sourceFrames(media, p.fps) : Infinity; // texto: sem limite, como imagens
+  if (!media && !origin.text && !origin.template) return p;
+  const src = media ? sourceFrames(media, p.fps) : Infinity; // texto/modelo: sem limite, como imagens
   const others = found.track.clips.filter((c) => c.id !== origin.id);
   const isImage = !Number.isFinite(src);
   let { start, duration, trimStart } = origin;
@@ -557,4 +561,45 @@ export function clearKeyframes(p: Project, clipId: string, rel: number): Project
   if (!f?.clip.keyframes?.length) return p;
   const vals = valuesAt(f.clip, rel);
   return setAnimatedProps(updateClip(p, clipId, { keyframes: undefined }), clipId, 0, vals);
+}
+
+/**
+ * Adiciona um clip de modelo. Pista: a indicada (se for de vídeo) ou a primeira pista de vídeo
+ * livre a contar de cima; se nenhuma tiver espaço, cria uma nova no topo.
+ */
+export function addTemplateClip(
+  p: Project, templateId: string, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean } = {},
+): { project: Project; clipId: string | null } {
+  const def = getTemplate(templateId);
+  if (!def) return { project: p, clipId: null };
+  const duration = Math.max(1, Math.round(def.durationSec * p.fps));
+  let project = p;
+  let track = opts.trackId ? p.tracks.find((t) => t.id === opts.trackId && t.kind === 'video') : undefined;
+  if (!track && !opts.newTrack) track = p.tracks.find((t) => t.kind === 'video' && overlaps(t, start, duration).length === 0);
+  if (!track) {
+    const r = addTrack(project, 'video', true);
+    project = r.project;
+    track = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  const desired = opts.magnet ? magnetStart(track, start) : start;
+  const clip: Clip = {
+    id: uid('c'),
+    mediaId: '',
+    start: freeStart(track, desired, duration),
+    duration,
+    trimStart: 0,
+    volume: 1,
+    fadeIn: 0,
+    fadeOut: 0,
+    template: { id: templateId, props: templateDefaults(def) },
+  };
+  const trackId = track.id;
+  project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
+  return { project, clipId: clip.id };
+}
+
+export function updateTemplateProps(p: Project, clipId: string, patch: Record<string, unknown>): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.template) return p;
+  return updateClip(p, clipId, { template: { ...f.clip.template, props: { ...f.clip.template.props, ...patch } } });
 }

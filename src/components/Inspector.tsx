@@ -5,8 +5,9 @@ import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row } from './Fields';
-import { AnimSection, ColorSection, SpeedSection, TextFields, TransformSection } from './ClipPanels';
-import type { Project, TransitionType } from '../../shared/types';
+import { AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { getTemplate } from '../../shared/templates';
+import type { MediaItem, Project, TransitionType } from '../../shared/types';
 import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 
@@ -115,7 +116,11 @@ export const Inspector: React.FC = () => {
   }
 
   const { clip, track } = found;
-  const media = project.media.find((m) => m.id === clip.mediaId);
+  const tplDef = clip.template ? getTemplate(clip.template.id) : undefined;
+  // modelos comportam-se como uma imagem do tamanho do quadro (enquadrar, cor, animação)
+  const media: MediaItem | undefined = clip.template
+    ? { id: '', path: '', name: tplDef?.name ?? 'Modelo', kind: 'image', durationSec: 0, width: project.width, height: project.height }
+    : project.media.find((m) => m.id === clip.mediaId);
   const fps = project.fps;
   const maxFade = Math.max(0, Math.floor(clip.duration / 2));
   const sec = (frames: number) => (frames / fps).toFixed(2).replace('.', ',');
@@ -161,7 +166,7 @@ export const Inspector: React.FC = () => {
       </header>
       {hasTabs && (
         <div className="tabs" role="tablist">
-          {([['basic', 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
+          {([['basic', clip.template ? 'Modelo' : 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={curTab === id} className={curTab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
@@ -176,6 +181,7 @@ export const Inspector: React.FC = () => {
               <dt>Pista</dt><dd>{track.name}</dd>
             </dl>
             {actions}
+            {clip.template && (tplDef ? <TemplateFields clip={clip} def={tplDef} /> : <p className="hint">Este modelo já não existe na pasta modelos/.</p>)}
 
             {media?.kind === 'video' && isVisual && (
               <div className="audio-box">

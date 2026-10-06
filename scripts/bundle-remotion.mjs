@@ -3,10 +3,12 @@
 import { bundle } from '@remotion/bundler';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { generateTemplatesIndex } from './gen-templates.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'remotion-bundle');
 
+generateTemplatesIndex(root);
 const t = Date.now();
 await bundle({
   entryPoint: path.join(root, 'shared/remotion-root.tsx'),

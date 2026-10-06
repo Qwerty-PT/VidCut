@@ -555,3 +555,22 @@ body.tf-dragging, body.tf-dragging * { user-select: none; }
 .kf-count { flex: 1; font-size: 11px; color: var(--text-dim); }
 .kf-bar .seg { background: var(--panel); }
 .inspector-body { overflow-x: hidden; }
+
+/* ---------- modelos ---------- */
+.bin-head { padding-left: 6px; }
+.bin-tabs { display: flex; gap: 2px; height: 100%; }
+.bin-tabs button { border: 0; background: transparent; color: var(--text-dim); font: 600 13px var(--font); padding: 0 8px; cursor: pointer; border-bottom: 2px solid transparent; }
+.bin-tabs button:hover { color: var(--text); }
+.bin-tabs button.on { color: var(--text); border-bottom-color: var(--amber); }
+.tpl-gallery { overflow-y: auto; padding: 4px 10px 12px; }
+.tpl-cat { font-size: 11.5px; font-weight: 600; color: var(--text-dim); margin: 12px 0 6px; }
+.tpl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tpl-card { cursor: grab; min-width: 0; }
+.tpl-thumb { border-radius: 6px; overflow: hidden; outline: 1px solid var(--line-soft); background: #000; }
+.tpl-card:hover .tpl-thumb { outline-color: var(--amber); }
+.tpl-name { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tpl-foot, .tpl-empty { margin-top: 14px; }
+.clip.kind-template { background-color: #2f5b5e; }
+.num-row { display: grid; grid-template-columns: 1fr 76px; gap: 8px; align-items: center; }
+.num-row input[type='number'] { height: 28px; padding: 0 6px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); }
+.tpl-fields .field input[type='text'] { width: 100%; }

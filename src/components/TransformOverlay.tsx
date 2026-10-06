@@ -5,6 +5,7 @@ import { findClip, setAnimatedProps } from '../ops';
 import { animatedTransform } from '../../shared/keyframes';
 import { clamp } from '../util';
 import { baseSize, getTransform } from '../../shared/transform';
+import type { MediaItem } from '../../shared/types';
 
 const SNAPS = [50, 100 / 3, 200 / 3];
 
@@ -19,7 +20,9 @@ export const TransformOverlay: React.FC = () => {
   const { project } = state;
   const sel = state.selection.length === 1 ? findClip(project, state.selection[0]) : null;
   const clip = sel?.clip;
-  const media = clip ? project.media.find((m) => m.id === clip.mediaId) : undefined;
+  const media: MediaItem | undefined = clip?.template
+    ? { id: '', path: '', name: '', kind: 'image', durationSec: 0, width: project.width, height: project.height }
+    : clip ? project.media.find((m) => m.id === clip.mediaId) : undefined;
   if (!clip || !sel || sel.track.kind !== 'video' || !media || media.kind === 'audio') return null;
   if (frame < clip.start || frame >= clip.start + clip.duration) return null;
 

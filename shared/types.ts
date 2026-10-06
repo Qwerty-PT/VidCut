@@ -50,6 +50,8 @@ export interface Clip {
   color?: ClipColor;
   /** Keyframes de posição/escala/rotação/opacidade (frames relativos ao início do clip) */
   keyframes?: Keyframe[];
+  /** Clips de modelo programático (mediaId vazio) */
+  template?: { id: string; props: Record<string, unknown> };
 }
 
 export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';

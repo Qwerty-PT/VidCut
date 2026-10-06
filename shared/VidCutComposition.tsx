@@ -8,6 +8,8 @@ import { animState, blockStyle } from './anim';
 import { TextLayer } from './TextLayer';
 import { baseSize, mediaStyle } from './transform';
 import { animatedTransform } from './keyframes';
+import { getTemplate } from './templates';
+import { TemplateDurationContext } from './template-api';
 
 
 const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
@@ -82,12 +84,13 @@ const ColorOverlays: React.FC<{ color?: ClipColor }> = ({ color }) => {
 };
 
 const VisualClip: React.FC<{
-  clip: Clip; media: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
-}> = ({ clip, media, track, base, fps, act, from, pre, post }) => {
+  clip: Clip; media?: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
+  resolveMedia: (id: string) => string;
+}> = ({ clip, media, track, base, fps, act, from, pre, post, resolveMedia }) => {
   const local = useCurrentFrame();
   const { width: W, height: H } = useVideoConfig();
   const look = clipLook(clip, act, from + local);
-  const src = mediaUrl(base, media.path);
+  const src = media ? mediaUrl(base, media.path) : '';
   const tf = animatedTransform(clip, clampFrame(from + local - clip.start, clip.duration));
   look.opacity *= tf.opacity;
   const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
@@ -95,12 +98,33 @@ const VisualClip: React.FC<{
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
   // caixa posicionada/transformada com filtros de cor; a media enche a caixa
   const frameBox = (children: React.ReactNode) => (
-    <div style={{ ...mediaStyle(tf, baseSize(media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
+    <div style={{ ...mediaStyle(tf, clip.template ? { w: W, h: H } : baseSize(media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
       {children}
       <ColorOverlays color={clip.color} />
     </div>
   );
 
+  if (clip.template) {
+    const def = getTemplate(clip.template.id);
+    if (!def) return null;
+    const props: Record<string, unknown> = { ...clip.template.props };
+    for (const f of def.fields) if (f.type === 'image') props[f.key] = props[f.key] ? resolveMedia(String(props[f.key])) : '';
+    for (const f of def.fields) if (props[f.key] === undefined) props[f.key] = f.default;
+    const Comp = def.component;
+    return (
+      <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+        {frameBox(
+          <Sequence from={pre} durationInFrames={clip.duration + post} layout="none">
+            <TemplateDurationContext.Provider value={clip.duration}>
+              <Comp p={props} />
+            </TemplateDurationContext.Provider>
+          </Sequence>,
+        )}
+      </AbsoluteFill>
+    );
+  }
+
+  if (!media) return null;
   if (media.kind === 'image') {
     return (
       <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
@@ -165,6 +189,7 @@ const AudioClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: st
 
 export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBase }) => {
   const mediaById = new Map(project.media.map((m) => [m.id, m]));
+  const resolveMedia = (id: string) => { const m = mediaById.get(id); return m ? mediaUrl(mediaBase, m.path) : ''; };
   // Pista 0 fica por cima → desenhar de baixo para cima
   const ordered = [...project.tracks].reverse();
 
@@ -174,7 +199,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
           if (clip.duration <= 0) return null;
-          if (!media && !(clip.text && track.kind !== 'audio')) return null;
+          if (!media && !((clip.text || clip.template) && track.kind !== 'audio')) return null;
           if (track.kind === 'audio' && media) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
@@ -183,7 +208,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
             );
           }
           if (track.hidden) return null;
-          if (clip.text || !media) {
+          if (clip.text || (!media && !clip.template)) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name="Texto">
                 {clip.text && <TextLayer clip={clip} text={clip.text} />}
@@ -195,8 +220,8 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
           const post = act.outT?.post ?? 0;
           const from = clip.start - pre;
           return (
-            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media.name}>
-              <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} />
+            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media?.name ?? clip.template?.id}>
+              <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} resolveMedia={resolveMedia} />
             </Sequence>
           );
         }),

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { moveKeyframe, addClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
 import { clamp, isTyping, timecode } from '../util';
 import { projectDuration, type Clip, type Keyframe, type MediaItem, type Project, type Track } from '../../shared/types';
-import { MEDIA_DRAG_TYPE } from './MediaBin';
+import { MEDIA_DRAG_TYPE, TEMPLATE_DRAG_TYPE } from './MediaBin';
+import { getTemplate } from '../../shared/templates';
 import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
 
@@ -336,7 +337,7 @@ export const Timeline: React.FC = () => {
   };
 
   // ---------- largar media ----------
-  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
+  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
 
   const onDrop = async (e: React.DragEvent, trackId: string | undefined, newTrack = false) => {
     e.preventDefault();
@@ -344,7 +345,13 @@ export const Timeline: React.FC = () => {
     setDropTarget(null);
     const start = Math.max(0, Math.round(frameAtClientX(e.clientX)));
     const mediaId = e.dataTransfer.getData(MEDIA_DRAG_TYPE);
-    if (mediaId) {
+    const templateId = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
+    if (templateId) {
+      commit((p) => {
+        const r = addTemplateClip(p, templateId, start, { trackId, newTrack, magnet: snap });
+        return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
+      });
+    } else if (mediaId) {
       commit((p) => {
         const r = addClip(p, mediaId, { trackId, start, newTrack, magnet: snap });
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
@@ -645,12 +652,12 @@ const ClipView: React.FC<{
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
-  const kind = clip.text ? 'text' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
+  const kind = clip.text ? 'text' : clip.template ? 'template' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
     <div
-      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text ? '' : ' missing'}`}
+      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       onPointerDown={(e) => onDown(e, 'move')}
       onContextMenu={onMenu}
@@ -663,7 +670,7 @@ const ClipView: React.FC<{
           {fo > 0 && <polygon points={`${w},0 ${w - fo},0 ${w},100`} />}
         </svg>
       )}
-      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : media?.name ?? 'Ficheiro em falta'}</span>}
+      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}

@@ -1,8 +1,9 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, addKeyframe, clearKeyframes, removeKeyframe, setAnimatedProps, setKeyframeEasing, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
+import { updateTemplateProps, DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, addKeyframe, clearKeyframes, removeKeyframe, setAnimatedProps, setKeyframeEasing, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
 import { useFrame, playhead } from '../playhead';
 import { KF_EASINGS, keyframeAt, valuesAt } from '../../shared/keyframes';
+import type { FieldDef, TemplateDef } from '../../shared/template-api';
 import { Range, Row, Segmented } from './Fields';
 import { Icon } from './Icon';
 import type { AnimPreset, Clip, ClipAnim, ClipColor, MediaItem, TextContent } from '../../shared/types';
@@ -381,5 +382,83 @@ export const KeyframeBar: React.FC<{ clip: Clip }> = ({ clip }) => {
       )}
       {!kfs.length && <p className="hint">Para animar: põe a cabeça de leitura no início, carrega em "Adicionar keyframe", avança e muda a posição/escala/rotação — o keyframe seguinte é criado sozinho.</p>}
     </div>
+  );
+};
+
+/** Campos de um modelo, gerados automaticamente a partir de `fields` */
+export const TemplateFields: React.FC<{ clip: Clip; def: TemplateDef }> = ({ clip, def }) => {
+  const { state, commit, dispatch } = useEditor();
+  const props = clip.template?.props ?? {};
+  const val = (f: FieldDef) => (props[f.key] === undefined ? f.default : props[f.key]);
+  const set = (key: string, v: unknown) => commit((p) => updateTemplateProps(p, clip.id, { [key]: v }));
+  const typing = (key: string) => ({
+    onFocus: () => dispatch({ type: 'beginGesture' }),
+    onBlur: () => dispatch({ type: 'endGesture' }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const v = e.target.value;
+      dispatch({ type: 'gesture', fn: (p) => updateTemplateProps(p, clip.id, { [key]: v }) });
+    },
+  });
+  const images = state.project.media.filter((m) => m.kind === 'image');
+  return (
+    <section className="section tpl-fields">
+      <h3 className="section-title">{def.name}</h3>
+      {def.description && <p className="hint">{def.description}</p>}
+      {def.fields.map((f) => {
+        const v = val(f);
+        switch (f.type) {
+          case 'text':
+            return <Row key={f.key} label={f.label}><input type="text" value={String(v)} {...typing(f.key)} /></Row>;
+          case 'textarea':
+            return (
+              <label key={f.key} className="field">
+                <span className="field-label">{f.label}</span>
+                <textarea className="text-input" rows={4} value={String(v)} {...typing(f.key)} />
+              </label>
+            );
+          case 'color':
+            return (
+              <Row key={f.key} label={f.label}>
+                <div className="color-row"><input type="color" value={String(v)} onChange={(e) => set(f.key, e.target.value)} /><code>{String(v)}</code></div>
+              </Row>
+            );
+          case 'number':
+            return (
+              <Row key={f.key} label={f.label} hint={String(Math.round(Number(v) * 100) / 100)}>
+                <div className="num-row">
+                  <Range min={f.min} max={f.max} step={f.step ?? (f.max - f.min > 100 ? 1 : 0.1)} value={Number(v)} apply={(n) => (p) => updateTemplateProps(p, clip.id, { [f.key]: n })} />
+                  <input type="number" min={f.min} max={f.max} step={f.step ?? 1} value={Number(v)} onChange={(e) => set(f.key, Number(e.target.value))} />
+                </div>
+              </Row>
+            );
+          case 'select':
+            return (
+              <Row key={f.key} label={f.label}>
+                <select value={String(v)} onChange={(e) => set(f.key, e.target.value)}>
+                  {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </Row>
+            );
+          case 'boolean':
+            return (
+              <label key={f.key} className="check">
+                <input type="checkbox" checked={Boolean(v)} onChange={(e) => set(f.key, e.target.checked)} /> {f.label}
+              </label>
+            );
+          case 'image':
+            return (
+              <Row key={f.key} label={f.label}>
+                <select value={String(v)} onChange={(e) => set(f.key, e.target.value)}>
+                  <option value="">— nenhuma —</option>
+                  {images.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                {!images.length && <span className="hint">Importa primeiro uma imagem (PNG com transparência fica melhor).</span>}
+              </Row>
+            );
+          default:
+            return null;
+        }
+      })}
+    </section>
   );
 };

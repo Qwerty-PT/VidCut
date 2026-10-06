@@ -5,9 +5,11 @@ import { getThumb, onThumbsChange } from '../media';
 import { addClip, mediaInUse, removeMedia } from '../ops';
 import { playhead } from '../playhead';
 import { Icon } from './Icon';
+import { TemplateGallery } from './TemplateGallery';
 import type { MediaItem } from '../../shared/types';
 
 export const MEDIA_DRAG_TYPE = 'application/x-vidcut-media';
+export const TEMPLATE_DRAG_TYPE = 'application/x-vidcut-template';
 
 function fmtDur(sec: number) {
   if (!sec) return '';
@@ -19,6 +21,7 @@ export const MediaBin: React.FC = () => {
   const { state, commit, importPaths, notify } = useEditor();
   const [, force] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+  const [tab, setTab] = useState<'media' | 'templates'>('media');
   useEffect(() => onThumbsChange(() => force((n) => n + 1)), []);
 
   const pick = async () => {
@@ -55,11 +58,14 @@ export const MediaBin: React.FC = () => {
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
-      <header className="panel-head">
-        <h2>Media</h2>
-        <button className="btn small" onClick={pick}><Icon name="import" size={16} /> Importar</button>
+      <header className="panel-head bin-head">
+        <div className="bin-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'media'} className={tab === 'media' ? 'on' : ''} onClick={() => setTab('media')}>Media</button>
+          <button role="tab" aria-selected={tab === 'templates'} className={tab === 'templates' ? 'on' : ''} onClick={() => setTab('templates')}>Modelos</button>
+        </div>
+        {tab === 'media' && <button className="btn small" onClick={pick}><Icon name="import" size={16} /> Importar</button>}
       </header>
-      {media.length === 0 ? (
+      {tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
         <button className="empty-drop" onClick={pick}>
           <Icon name="import" size={28} />
           <strong>Importar media</strong>
