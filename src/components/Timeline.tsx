@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { addClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { addClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
@@ -12,7 +12,7 @@ import { Icon } from './Icon';
 
 const HEADER_W = 156;
 const RULER_H = 30;
-const TRACK_H: Record<Track['kind'], number> = { video: 66, audio: 50 };
+const TRACK_H: Record<Track['kind'], number> = { video: 66, audio: 50, text: 40 };
 const SNAP_PX = 8;
 const MIN_PPS = 2; // px por segundo
 const MAX_PPS = 4000; // ~0,25 s visíveis num ecrã normal
@@ -372,6 +372,10 @@ export const Timeline: React.FC = () => {
           <button className="icon-btn" title="Apagar seleção (Delete)" disabled={!selection.length} onClick={() => commit((p) => deleteClips(p, selection), [])}><Icon name="trash" /></button>
           <span className="sep" />
           <button className={`icon-btn${snap ? ' on' : ''}`} title="Íman: encaixar em clips e na cabeça de leitura" onClick={() => setSnap(!snap)}><Icon name="magnet" /></button>
+          <span className="sep" />
+          <button className="btn small" title="Adicionar texto na cabeça de leitura (T)" onClick={() => commit((p) => { const r = addTextClip(p, playhead.frame); return { project: r.project, select: [r.clipId] }; })}>
+            <Icon name="type" size={15} /> Texto
+          </button>
         </div>
         <div className="tl-zoom">
           <button className="icon-btn" title="Afastar (-)" onClick={() => zoomTo(pps / 1.4)}><Icon name="minus" /></button>
@@ -523,21 +527,24 @@ interface TrackRowProps {
 
 const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
   const isVideo = track.kind === 'video';
+  const isText = track.kind === 'text';
   return (
     <div className={`tl-row kind-${track.kind}`} style={{ height: TRACK_H[track.kind] }} data-track-id={track.id} data-track-kind={track.kind}>
       <div className="tl-head" style={{ width: HEADER_W }}>
-        <span className="tl-head-icon"><Icon name={isVideo ? 'film' : 'music'} size={15} /></span>
+        <span className="tl-head-icon"><Icon name={isVideo ? 'film' : isText ? 'type' : 'music'} size={15} /></span>
         <span className="tl-head-name">{track.name}</span>
         <div className="tl-head-btns">
-          {isVideo && (
+          {(isVideo || isText) && (
             <button className={`icon-btn mini${track.hidden ? ' off' : ''}`} title={track.hidden ? 'Mostrar pista' : 'Esconder pista'} onClick={() => onToggle({ hidden: !track.hidden })}>
               <Icon name={track.hidden ? 'eyeOff' : 'eye'} size={15} />
             </button>
           )}
-          <button className={`icon-btn mini${track.muted ? ' off' : ''}`} title={track.muted ? 'Ativar som' : 'Silenciar pista'} onClick={() => onToggle({ muted: !track.muted })}>
-            <Icon name={track.muted ? 'mute' : 'volume'} size={15} />
-          </button>
-          {track.clips.length === 0 && project.tracks.filter((t) => t.kind === track.kind).length > 1 && (
+          {!isText && (
+            <button className={`icon-btn mini${track.muted ? ' off' : ''}`} title={track.muted ? 'Ativar som' : 'Silenciar pista'} onClick={() => onToggle({ muted: !track.muted })}>
+              <Icon name={track.muted ? 'mute' : 'volume'} size={15} />
+            </button>
+          )}
+          {track.clips.length === 0 && (isText || project.tracks.filter((t) => t.kind === track.kind).length > 1) && (
             <button className="icon-btn mini" title="Remover pista vazia" onClick={onRemove}><Icon name="x" size={14} /></button>
           )}
         </div>
@@ -609,16 +616,16 @@ const ClipView: React.FC<{
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
-  const kind = trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
+  const kind = clip.text ? 'text' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
     <div
-      className={`clip kind-${kind}${selected ? ' selected' : ''}${media ? '' : ' missing'}`}
+      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       onPointerDown={(e) => onDown(e, 'move')}
       onContextMenu={onMenu}
-      title={media?.name}
+      title={clip.text ? clip.text.text : media?.name}
     >
       {kind === 'audio' && <div className="clip-wave" />}
       {(fi > 0 || fo > 0) && (
@@ -627,12 +634,12 @@ const ClipView: React.FC<{
           {fo > 0 && <polygon points={`${w},0 ${w - fo},0 ${w},100`} />}
         </svg>
       )}
-      {w > 36 && <span className="clip-name">{media?.name ?? 'Ficheiro em falta'}</span>}
+      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
-      {w > 40 && (
+      {w > 40 && !clip.text && (
         <>
           <div
             className={`clip-fade-knob in${clip.fadeIn ? ' on' : ''}`}

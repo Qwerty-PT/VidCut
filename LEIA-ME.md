@@ -19,6 +19,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume. Ajusta-se no painel ou a arrastar as bolinhas no canto superior de cada clip (esquerda: fade in, direita: fade out)
 - **Transições** entre clips encostados na mesma pista de vídeo: passa o rato na junção e carrega no **+**. Tipos: Dissolver, Fundido a preto, Deslizar, Empurrar, Cortina, Zoom. Duração com presets IBM (Rápida 240 ms, Média 400 ms, Lenta 700 ms, 1 s) e curva IBM expressiva. A transição fica centrada no corte; se um clip não tiver imagem extra para lá do corte, o primeiro/último frame fica parado durante a transição. Seleciona o bloco da transição para mudar ou apagar (`Delete`)
 - Volume por clip (0–200 %), silenciar e esconder pistas
+- **Texto**: botão "Texto" na barra da timeline (ou tecla `T`) cria um texto de 3 s na cabeça de leitura, numa pista de texto por cima de tudo. Edita-se no painel da direita: texto (várias linhas), fonte IBM Plex (Sans, Serif, Mono, embutidas), peso, tamanho, cor, alinhamento, posição (grelha de 9 posições, sliders ou **arrastar na pré-visualização** com encaixe no centro e nos terços), largura máxima, caixa de fundo e sombra
+- **Animações de entrada e saída** (texto, imagens e vídeos): Aparecer, Subir, Descer, Da direita, Da esquerda, Escala, Revelar e, só no texto, Máquina de escrever, Palavra a palavra e Linha a linha (com desfasamento entre partes). Curva IBM Produtiva ou Expressiva e duração com presets IBM. Por defeito o texto entra a subir (Expressiva, 400 ms) e sai a desaparecer (Produtiva, 240 ms)
 - Desfazer / refazer (arrastar um clip ou um slider conta como um só passo)
 - Projeto: resolução (16:9, 4K, 9:16, 1:1, 4:5, 720p), fps (24, 25, 30, 50, 60 — nunca abaixo de 24, regra IBM), cor de fundo
 - Guardar e abrir projetos `.vidcut` (JSON), gravação automática contínua
@@ -59,6 +61,7 @@ Notas:
 |---|---|
 | `Espaço` | Reproduzir / pausa |
 | `S` | Dividir na cabeça de leitura (clips selecionados, ou todos os que estão por baixo) |
+| `T` | Adicionar texto na cabeça de leitura |
 | `Q` | Dividir e eliminar à esquerda da cabeça de leitura |
 | `W` | Dividir e eliminar à direita da cabeça de leitura |
 | `Delete` / `Backspace` | Apagar seleção |
@@ -134,5 +137,5 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
 2. ~~Transições entre clips e pegas de fade arrastáveis~~ (feito)
-3. **Texto e animações**: pista de texto/formas, presets IBM (productive/expressive) já definidos em `shared/motion.ts`, keyframes, stagger automático
+3. ~~Texto e animações de entrada/saída~~ (feito). Falta: formas, keyframes (animar posição/escala ao longo do tempo)
 4. **Efeitos**: velocidade, cor/brilho, blur, crop/zoom, presets guardáveis

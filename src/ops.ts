@@ -1,6 +1,7 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, MediaItem, Project, Track, TrackKind } from '../shared/types';
+import type { Clip, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
 
@@ -63,13 +64,16 @@ export function addTrack(p: Project, kind: TrackKind, atTop = false): { project:
   const track: Track = {
     id: uid('t'),
     kind,
-    name: `${kind === 'video' ? 'Vídeo' : 'Áudio'} ${n}`,
+    name: `${kind === 'video' ? 'Vídeo' : kind === 'text' ? 'Texto' : 'Áudio'} ${n}`,
     muted: false,
     hidden: false,
     clips: [],
   };
   let tracks: Track[];
-  if (kind === 'video') {
+  if (kind === 'text') {
+    // pistas de texto ficam sempre por cima de tudo
+    tracks = [track, ...p.tracks];
+  } else if (kind === 'video') {
     // pistas de vídeo ficam todas acima das de áudio
     const lastVideo = p.tracks.map((t) => t.kind).lastIndexOf('video');
     tracks = [...p.tracks];
@@ -170,8 +174,8 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const found = findClip(p, origin.id);
   if (!found) return p;
   const media = p.media.find((m) => m.id === origin.mediaId);
-  if (!media) return p;
-  const src = sourceFrames(media, p.fps);
+  if (!media && !origin.text) return p;
+  const src = media ? sourceFrames(media, p.fps) : Infinity; // texto: sem limite, como imagens
   const others = found.track.clips.filter((c) => c.id !== origin.id);
   const isImage = !Number.isFinite(src);
   let { start, duration, trimStart } = origin;
@@ -368,4 +372,53 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
 /** Define (ou remove, com undefined) a transição de entrada de um clip */
 export function setTransition(p: Project, clipId: string, transition: Clip['transition']): Project {
   return updateClip(p, clipId, { transition });
+}
+
+export function defaultText(): TextContent {
+  return {
+    text: 'Escreve aqui o teu texto',
+    font: 'sans',
+    size: 72,
+    weight: 600,
+    color: '#ffffff',
+    align: 'center',
+    x: 50,
+    y: 80, // terço inferior
+    maxWidth: 80,
+    background: null,
+    shadow: true,
+  };
+}
+
+/** Adiciona um clip de texto (3 s) na cabeça de leitura, numa pista de texto livre (ou nova) */
+export function addTextClip(p: Project, start: number): { project: Project; clipId: string } {
+  const duration = 3 * p.fps;
+  let project = p;
+  let track = p.tracks.find((t) => t.kind === 'text' && overlaps(t, start, duration).length === 0);
+  if (!track) {
+    const r = addTrack(project, 'text');
+    project = r.project;
+    track = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  const clip: Clip = {
+    id: uid('c'),
+    mediaId: '',
+    start: Math.max(0, Math.round(start)),
+    duration,
+    trimStart: 0,
+    volume: 1,
+    fadeIn: 0,
+    fadeOut: 0,
+    text: defaultText(),
+    ...defaultTextAnims(p.fps),
+  };
+  const trackId = track.id;
+  project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
+  return { project, clipId: clip.id };
+}
+
+export function updateText(p: Project, clipId: string, patch: Partial<TextContent>): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.text) return p;
+  return updateClip(p, clipId, { text: { ...f.clip.text, ...patch } });
 }

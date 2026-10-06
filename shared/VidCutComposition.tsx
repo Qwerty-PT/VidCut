@@ -4,6 +4,8 @@ import type { Clip, CompositionProps, MediaItem, Track } from './types';
 import { mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
+import { animState, blockStyle } from './anim';
+import { TextLayer } from './TextLayer';
 
 const fill: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'contain' };
 
@@ -26,6 +28,14 @@ function clipLook(clip: Clip, act: ActiveTransitions, g: number) {
     const w0 = clip.start - act.inT.pre;
     const len = act.inT.pre + act.inT.post;
     if (g < w0 + len) apply('in', act.inT.type, (g - w0) / len);
+  }
+  // animação de entrada/saída (mesmos presets do texto, aplicados ao clip inteiro)
+  const st = animState(clip.animIn, clip.animOut, g - clip.start, clip.duration);
+  if (st.phase !== 'idle' && st.anim && g >= clip.start && g < clip.start + clip.duration) {
+    const r = blockStyle(st.anim.preset, st.p, 120);
+    opacity *= r.opacity;
+    if (r.style.transform) transforms.push(String(r.style.transform));
+    if (r.style.clipPath) clipPath = String(r.style.clipPath);
   }
   if (act.outT) {
     const end = clip.start + clip.duration;
@@ -110,8 +120,9 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
       {ordered.map((track) =>
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
-          if (!media || clip.duration <= 0) return null;
-          if (track.kind === 'audio') {
+          if (clip.duration <= 0) return null;
+          if (!media && !(clip.text && track.kind !== 'audio')) return null;
+          if (track.kind === 'audio' && media) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
                 <AudioClip clip={clip} media={media} track={track} base={mediaBase} />
@@ -119,6 +130,13 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
             );
           }
           if (track.hidden) return null;
+          if (clip.text || !media) {
+            return (
+              <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name="Texto">
+                {clip.text && <TextLayer clip={clip} text={clip.text} />}
+              </Sequence>
+            );
+          }
           const act = activeTransitions(track, clip);
           const pre = act.inT?.pre ?? 0;
           const post = act.outT?.post ?? 0;

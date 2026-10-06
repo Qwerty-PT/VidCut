@@ -4,6 +4,8 @@ import { TRANSITION_PREFIX, setTransition, canDetachAudio, changeFps, clipsAt, c
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
+import { Range, Row } from './Fields';
+import { AnimSection, TextFields } from './ClipPanels';
 import type { Project, TransitionType } from '../../shared/types';
 import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
@@ -43,31 +45,6 @@ export function cutAtPlayhead(project: Project, selection: string[], side: 'left
   const seekTo = side === 'left' ? Math.min(...underClips.filter((c) => ids.includes(c.id)).map((c) => c.start)) : f;
   return { project: cutAtFrame(project, ids, f, side), seekTo };
 }
-
-/** Slider que agrupa o arrastar num único passo do histórico */
-const Range: React.FC<{ value: number; min: number; max: number; step: number; apply: (v: number) => (p: Project) => Project }> = ({ value, min, max, step, apply }) => {
-  const { dispatch, commit } = useEditor();
-  const dragging = React.useRef(false);
-  return (
-    <input
-      type="range" min={min} max={max} step={step} value={value}
-      onPointerDown={() => { dragging.current = true; dispatch({ type: 'beginGesture' }); }}
-      onPointerUp={() => { dragging.current = false; dispatch({ type: 'endGesture' }); }}
-      onChange={(e) => {
-        const v = Number(e.target.value);
-        if (dragging.current) dispatch({ type: 'gesture', fn: apply(v) });
-        else commit(apply(v));
-      }}
-    />
-  );
-};
-
-const Row: React.FC<{ label: string; children: React.ReactNode; hint?: string }> = ({ label, children, hint }) => (
-  <label className="field">
-    <span className="field-label">{label}{hint && <em>{hint}</em>}</span>
-    {children}
-  </label>
-);
 
 export const Inspector: React.FC = () => {
   const { state, commit, dispatch } = useEditor();
@@ -140,6 +117,37 @@ export const Inspector: React.FC = () => {
   const maxFade = Math.max(0, Math.floor(clip.duration / 2));
   const sec = (frames: number) => (frames / fps).toFixed(2).replace('.', ',');
   const isVisual = track.kind === 'video';
+  const isText = !!clip.text;
+
+  const actions = (
+    <div className="btn-row">
+      <button className="btn" title="Dividir na cabeça de leitura (S)" onClick={() => { const r = splitAtPlayhead(project, [clip.id]); if (r) commit(() => r); }}>
+        <Icon name="split" size={16} /> Dividir
+      </button>
+      <button className="btn icon-only" title="Eliminar à esquerda da cabeça de leitura (Q)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } }}>
+        <Icon name="cutLeft" size={16} />
+      </button>
+      <button className="btn icon-only" title="Eliminar à direita da cabeça de leitura (W)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'right'); if (r) commit(() => r.project); }}>
+        <Icon name="cutRight" size={16} />
+      </button>
+      <button className="btn danger icon-only" title="Apagar clip (Delete)" onClick={() => commit((p) => deleteClips(p, [clip.id]), [])}>
+        <Icon name="trash" size={16} />
+      </button>
+    </div>
+  );
+
+  if (isText && clip.text) {
+    return (
+      <aside className="panel inspector">
+        <header className="panel-head"><h2>Texto</h2></header>
+        <div className="inspector-body">
+          <TextFields clip={clip} text={clip.text} />
+          <AnimSection clip={clip} isText fps={fps} />
+          {actions}
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="panel inspector">
@@ -196,20 +204,9 @@ export const Inspector: React.FC = () => {
             : 'No áudio, o fade sobe/desce o volume.'}
         </p>
 
-        <div className="btn-row">
-          <button className="btn" title="Dividir na cabeça de leitura (S)" onClick={() => { const r = splitAtPlayhead(project, [clip.id]); if (r) commit(() => r); }}>
-            <Icon name="split" size={16} /> Dividir
-          </button>
-          <button className="btn icon-only" title="Eliminar à esquerda da cabeça de leitura (Q)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } }}>
-            <Icon name="cutLeft" size={16} />
-          </button>
-          <button className="btn icon-only" title="Eliminar à direita da cabeça de leitura (W)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'right'); if (r) commit(() => r.project); }}>
-            <Icon name="cutRight" size={16} />
-          </button>
-          <button className="btn danger icon-only" title="Apagar clip (Delete)" onClick={() => commit((p) => deleteClips(p, [clip.id]), [])}>
-            <Icon name="trash" size={16} />
-          </button>
-        </div>
+        {isVisual && <AnimSection clip={clip} isText={false} fps={fps} />}
+
+        {actions}
       </div>
     </aside>
   );

@@ -57,7 +57,11 @@ export function reducer(s: EditorState, a: Action): EditorState {
     case 'beginGesture':
       return { ...s, gestureOrigin: s.project };
     case 'gesture': {
-      if (!s.gestureOrigin) return s;
+      if (!s.gestureOrigin) {
+        // sem gesto aberto (ex.: campo alterado sem foco): aplica como edição normal
+        const next = a.fn(s.project);
+        return next === s.project ? s : { ...s, project: next, past: push(s.past, s.project), future: [] };
+      }
       const next = a.fn(s.gestureOrigin);
       return next === s.project ? s : { ...s, project: next };
     }

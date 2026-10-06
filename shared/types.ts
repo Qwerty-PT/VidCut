@@ -2,7 +2,7 @@
 // Todos os tempos estão em FRAMES (inteiros), à taxa `project.fps`.
 
 export type MediaKind = 'video' | 'audio' | 'image';
-export type TrackKind = 'video' | 'audio';
+export type TrackKind = 'video' | 'audio' | 'text';
 
 export interface MediaItem {
   id: string;
@@ -37,6 +37,43 @@ export interface Clip {
   detachedAudioId?: string;
   /** Transição de entrada: do clip anterior (encostado, na mesma pista de vídeo) para este */
   transition?: Transition;
+  /** Animação de entrada / saída (clips visuais e texto) */
+  animIn?: ClipAnim;
+  animOut?: ClipAnim;
+  /** Clips de texto (mediaId vazio) */
+  text?: TextContent;
+}
+
+export type AnimPreset =
+  | 'none' | 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'scale' | 'reveal'
+  | 'typewriter' | 'words' | 'lines';
+
+export interface ClipAnim {
+  preset: AnimPreset;
+  /** Duração em frames */
+  duration: number;
+  /** Curva IBM: productive (discreta) ou expressive (destaque) */
+  style: 'productive' | 'expressive';
+}
+
+export type TextFont = 'sans' | 'serif' | 'mono';
+
+export interface TextContent {
+  text: string;
+  font: TextFont;
+  /** Tamanho em px numa referência de 1080 px de altura */
+  size: number;
+  weight: 400 | 600 | 700;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  /** Posição do centro do texto, em % do quadro */
+  x: number;
+  y: number;
+  /** Largura máxima em % do quadro */
+  maxWidth: number;
+  /** Caixa de fundo (null = sem caixa) */
+  background: string | null;
+  shadow: boolean;
 }
 
 export type TransitionType = 'dissolve' | 'dip' | 'slide' | 'push' | 'wipe' | 'zoom';

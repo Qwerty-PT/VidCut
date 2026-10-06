@@ -1,6 +1,7 @@
 // Entrada do bundle Remotion usado no export (renderMedia).
 import React from 'react';
-import { Composition, registerRoot } from 'remotion';
+import { Composition, continueRender, delayRender, registerRoot } from 'remotion';
+import { loadAllFonts } from './fonts';
 import { VidCutComposition } from './VidCutComposition';
 import type { CompositionProps } from './types';
 import { newProject, projectDuration } from './types';
@@ -22,5 +23,9 @@ const Root: React.FC = () => (
     })}
   />
 );
+
+// esperar pelas fontes antes de renderizar qualquer frame
+const fontsHandle = delayRender('A carregar fontes');
+loadAllFonts().then(() => continueRender(fontsHandle));
 
 registerRoot(Root);

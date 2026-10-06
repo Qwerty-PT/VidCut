@@ -4,7 +4,8 @@ import { VidCutComposition } from '../../shared/VidCutComposition';
 import { projectDuration, type CompositionProps } from '../../shared/types';
 import { useEditor } from '../editor-context';
 import { playhead, useFrame, usePlaying } from '../playhead';
-import { timecode } from '../util';
+import { clamp, timecode } from '../util';
+import { findClip, updateText } from '../ops';
 import { Icon } from './Icon';
 
 export const Preview: React.FC = () => {
@@ -62,6 +63,7 @@ export const Preview: React.FC = () => {
             moveToBeginningWhenEnded={false}
             acknowledgeRemotionLicense
           />
+          <TextDragOverlay />
         </div>
       </div>
       <Transport duration={duration} fps={project.fps} />
@@ -85,6 +87,49 @@ const Transport: React.FC<{ duration: number; fps: number }> = ({ duration, fps 
         <button className="icon-btn" title="Fim (End)" onClick={() => playhead.seek(duration - 1)}><Icon name="end" /></button>
       </div>
       <span className="tc dim">{timecode(duration, fps)}</span>
+    </div>
+  );
+};
+
+/** Com um texto selecionado (e visível), arrastar na pré-visualização move-o */
+const TextDragOverlay: React.FC = () => {
+  const { state, dispatch } = useEditor();
+  const frame = useFrame();
+  const sel = state.selection.length === 1 ? findClip(state.project, state.selection[0]) : null;
+  const clip = sel?.clip;
+  if (!clip?.text || frame < clip.start || frame >= clip.start + clip.duration) return null;
+  const text = clip.text;
+
+  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const box = e.currentTarget.getBoundingClientRect();
+    const x0 = e.clientX, y0 = e.clientY;
+    const ox = text.x, oy = text.y;
+    playhead.pause();
+    dispatch({ type: 'beginGesture' });
+    const move = (ev: PointerEvent) => {
+      let x = clamp(ox + ((ev.clientX - x0) / box.width) * 100, 0, 100);
+      let y = clamp(oy + ((ev.clientY - y0) / box.height) * 100, 0, 100);
+      // encaixar no centro e nos terços (grelha), como guia
+      for (const g of [50, 100 / 3, 200 / 3]) {
+        if (Math.abs(x - g) < 1.2) x = g;
+        if (Math.abs(y - g) < 1.2) y = g;
+      }
+      dispatch({ type: 'gesture', fn: (p) => updateText(p, clip.id, { x, y }) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      dispatch({ type: 'endGesture' });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <div className="text-drag" onPointerDown={onDown} title="Arrasta para mover o texto">
+      <div className="text-drag-mark" style={{ left: `${text.x}%`, top: `${text.y}%` }} />
     </div>
   );
 };

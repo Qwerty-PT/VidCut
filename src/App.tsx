@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } 
 import { api } from './api';
 import { EditorProvider, type EditorCtx } from './editor-context';
 import { initialState, reducer } from './state';
-import { addClip, addMedia, deleteClips } from './ops';
+import { addClip, addMedia, addTextClip, deleteClips } from './ops';
 import { probeMedia, refreshThumbs } from './media';
 import { playhead } from './playhead';
 import { isTyping } from './util';
@@ -187,6 +187,11 @@ export const App: React.FC = () => {
           e.preventDefault();
           const r = splitAtPlayhead(s.project, s.selection);
           if (r) commit(() => r);
+          break;
+        }
+        case 't': case 'T': {
+          e.preventDefault();
+          commit((p) => { const r = addTextClip(p, playhead.frame); return { project: r.project, select: [r.clipId] }; });
           break;
         }
         case 'q': case 'Q': case 'w': case 'W': {
