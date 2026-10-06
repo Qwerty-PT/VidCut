@@ -10,7 +10,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Timeline multi-pista (vídeo e áudio), pistas de vídeo de cima ficam por cima da imagem
 - Mover clips (também entre pistas do mesmo tipo), aparar pelas pontas, dividir, apagar
 - Íman: encaixa nas pontas de outros clips e na cabeça de leitura
-- Zoom da timeline: arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`
+- Magnet ao largar media: o clip cola-se ao fim do clip anterior nessa pista (ou ao início, se a pista estiver vazia). Com o íman desligado, fica onde o largaste
+- Zoom da timeline até ao frame (cerca de 0,3 s visíveis; a régua passa a mostrar frames): arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`
 - Barra de navegação: arrastar o meio para andar na timeline, clicar fora para saltar
 - **Separar áudio** de um clip de vídeo (botão direito no clip, ou no painel da direita): o som passa para uma pista de áudio, alinhado ao frame, e pode ser movido, cortado e ter volume e fades próprios. "Voltar a juntar o áudio" desfaz a separação
 - Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume

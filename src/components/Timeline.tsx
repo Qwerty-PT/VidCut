@@ -14,7 +14,7 @@ const RULER_H = 30;
 const TRACK_H: Record<Track['kind'], number> = { video: 66, audio: 50 };
 const SNAP_PX = 8;
 const MIN_PPS = 2; // px por segundo
-const MAX_PPS = 800;
+const MAX_PPS = 4000; // ~0,25 s visíveis num ecrã normal
 
 type Gesture = {
   mode: 'move' | 'left' | 'right';
@@ -31,8 +31,16 @@ function rulerLabel(sec: number, step: number, fps: number): string {
   return step < 1 ? tc : tc.replace(/\.\d+$/, '');
 }
 
-function niceStep(pps: number): number {
-  const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200];
+function visibleLabel(sec: number): string {
+  if (sec < 10) return `${sec.toFixed(sec < 1 ? 2 : 1).replace('.', ',')} s`;
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** Intervalo entre marcas grandes da régua (em segundos), com passos ao frame quando muito aproximado */
+function niceStep(pps: number, fps: number): number {
+  const frameSteps = [1, 2, 5, 10].map((n) => n / fps).filter((s) => s < 0.5);
+  const steps = [...frameSteps, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200];
   return steps.find((s) => s * pps >= 84) ?? 1200;
 }
 
@@ -300,12 +308,12 @@ export const Timeline: React.FC = () => {
     const mediaId = e.dataTransfer.getData(MEDIA_DRAG_TYPE);
     if (mediaId) {
       commit((p) => {
-        const r = addClip(p, mediaId, { trackId, start, newTrack });
+        const r = addClip(p, mediaId, { trackId, start, newTrack, magnet: snap });
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
       });
     } else if (e.dataTransfer.files.length) {
       const paths = Array.from(e.dataTransfer.files).map((f) => window.vidcut?.pathForFile(f) ?? '').filter(Boolean);
-      await importPaths(paths, { trackId, start, newTrack });
+      await importPaths(paths, { trackId, start, newTrack, magnet: snap });
     }
   };
 
@@ -316,12 +324,18 @@ export const Timeline: React.FC = () => {
   });
 
   // ---------- render ----------
-  const step = niceStep(pps);
+  const step = niceStep(pps, fps);
   const ticks: React.ReactNode[] = [];
   const totalSec = contentFrames / fps;
-  for (let i = 0; (i * step) / 5 <= totalSec; i++) {
-    const s = (i * step) / 5;
-    const major = i % 5 === 0;
+  // só as marcas visíveis (com margem), para aguentar zoom ao frame em projetos longos
+  // subdivisões: 5 por marca, ou uma por frame quando a marca vale menos de 5 frames
+  const div = step * fps < 5 ? Math.max(1, Math.round(step * fps)) : 5;
+  const minor = step / div;
+  const firstTick = Math.max(0, Math.floor((view.left / pps - step) / minor));
+  const lastTick = Math.ceil(Math.min(totalSec, (view.left + visW) / pps + step) / minor);
+  for (let i = firstTick - (firstTick % div); i <= lastTick; i++) {
+    const s = i * minor;
+    const major = i % div === 0;
     const x = s * pps;
     ticks.push(
       <div key={i} className={`tick${major ? ' major' : ''}`} style={{ left: x }}>
@@ -396,7 +410,7 @@ export const Timeline: React.FC = () => {
       </div>
 
       <div className="tl-nav">
-        <div className="tl-nav-label" style={{ width: HEADER_W }}>{timecode(Math.round(visW / z), fps).replace(/\.\d+$/, '')} visíveis</div>
+        <div className="tl-nav-label" style={{ width: HEADER_W }}>{visibleLabel(visW / pps)} visíveis</div>
         <div className="tl-nav-track" ref={navRef} onPointerDown={(e) => onNavDown(e, 'track')} title="Arrasta para navegar; arrasta as pontas para aproximar/afastar">
           <div className="tl-nav-thumb" style={{ left: `${thumbL * 100}%`, width: `${thumbW * 100}%` }} onPointerDown={(e) => onNavDown(e, 'thumb')}>
             <div className="tl-nav-grip left" onPointerDown={(e) => onNavDown(e, 'left')} title="Arrasta para aproximar/afastar" />

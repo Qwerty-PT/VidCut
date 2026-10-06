@@ -92,7 +92,7 @@ export const App: React.FC = () => {
         let start = place.start;
         for (const m of items) {
           const id = p.media.find((x) => x.path === m.path)!.id;
-          const r = addClip(p, id, { trackId: place.trackId, start, newTrack: place.newTrack && select.length === 0 });
+          const r = addClip(p, id, { trackId: place.trackId, start, newTrack: place.newTrack && select.length === 0, magnet: place.magnet });
           p = r.project;
           if (r.clipId) {
             select.push(r.clipId);

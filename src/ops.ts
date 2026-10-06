@@ -50,6 +50,14 @@ export function freeStart(track: Track, desired: number, duration: number, ignor
   return valid.reduce((best, s) => (Math.abs(s - desired) < Math.abs(best - desired) ? s : best));
 }
 
+/**
+ * Magnet ao largar: cola o clip ao fim do clip anterior ao ponto de largada nessa pista;
+ * se não houver nenhum antes, cola ao início (frame 0).
+ */
+export function magnetStart(track: Track, frame: number): number {
+  return track.clips.filter((c) => c.start < frame).reduce((end, c) => Math.max(end, c.start + c.duration), 0);
+}
+
 export function addTrack(p: Project, kind: TrackKind, atTop = false): { project: Project; trackId: string } {
   const n = p.tracks.filter((t) => t.kind === kind).length + 1;
   const track: Track = {
@@ -103,7 +111,7 @@ export function mediaInUse(p: Project, mediaId: string): boolean {
 export function addClip(
   p: Project,
   mediaId: string,
-  opts: { trackId?: string; start: number; newTrack?: boolean },
+  opts: { trackId?: string; start: number; newTrack?: boolean; magnet?: boolean },
 ): { project: Project; clipId: string | null } {
   const media = p.media.find((m) => m.id === mediaId);
   if (!media) return { project: p, clipId: null };
@@ -123,7 +131,7 @@ export function addClip(
   const clip: Clip = {
     id: uid('c'),
     mediaId,
-    start: freeStart(track, opts.start, duration),
+    start: freeStart(track, opts.magnet ? magnetStart(track, opts.start) : opts.start, duration),
     duration,
     trimStart: 0,
     volume: 1,

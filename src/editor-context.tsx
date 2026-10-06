@@ -8,7 +8,7 @@ export interface EditorCtx {
   /** Aplica uma edição ao projeto atual (com histórico). Calculada fora do reducer. */
   commit: (fn: (p: Project) => Project | { project: Project; select?: string[] }, select?: string[]) => void;
   mediaBase: string;
-  importPaths: (paths: string[], place?: { trackId?: string; start: number; newTrack?: boolean }) => Promise<void>;
+  importPaths: (paths: string[], place?: { trackId?: string; start: number; newTrack?: boolean; magnet?: boolean }) => Promise<void>;
   notify: (msg: string, kind?: 'info' | 'error') => void;
 }
 
