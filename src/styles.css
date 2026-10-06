@@ -218,7 +218,7 @@ input[type='range'] { accent-color: var(--amber); width: 100%; }
 
 .tl-ruler-row { display: flex; position: sticky; top: 0; z-index: 8; background: var(--panel); border-bottom: 1px solid var(--line); }
 .tl-corner { position: sticky; left: 0; z-index: 7; flex: none; background: var(--panel); border-right: 1px solid var(--line); }
-.tl-ruler { position: relative; flex: 1; cursor: ew-resize; }
+.tl-ruler { position: relative; flex: 1; cursor: default; }
 .tick { position: absolute; bottom: 0; width: 1px; height: 5px; background: var(--line); }
 .tick.major { height: 10px; background: var(--text-faint); }
 .tick span {
@@ -292,24 +292,24 @@ input[type='range'] { accent-color: var(--amber); width: 100%; }
 .tl-playhead {
   /* área de toque de 11px à volta da linha de 2px */
   position: absolute; left: 0; width: 11px; margin-left: -5.5px;
-  z-index: 5; cursor: ew-resize; touch-action: none;
+  z-index: 5; cursor: move; touch-action: none;
 }
 .tl-playhead-line {
   position: absolute; top: 0; bottom: 0; left: 4.5px; width: 2px;
   background: var(--amber); box-shadow: 0 0 6px rgba(242, 179, 61, 0.5);
   transition: width 110ms var(--ease), left 110ms var(--ease);
 }
-.tl-playhead:hover .tl-playhead-line, body.scrubbing .tl-playhead-line { left: 3.5px; width: 4px; border-radius: 2px; }
 
 .tl-playhead-handle {
   position: absolute; top: 0; bottom: 0; left: 0; width: 16px; margin-left: -8px;
-  z-index: 2; cursor: ew-resize; touch-action: none;
+  z-index: 2; cursor: move; touch-action: none;
 }
 .tl-playhead-handle svg { position: absolute; top: 3px; left: 0; display: block; }
-.tl-playhead-handle path { fill: var(--amber); stroke: #8a5e10; stroke-width: 1; }
-.tl-playhead-handle:hover path, body.scrubbing .tl-playhead-handle path { fill: #f7c763; }
+/* como no CapCut: pega vazada, enche ao passar o rato ou ao arrastar */
+.tl-playhead-handle path { fill: var(--panel); stroke: var(--amber); stroke-width: 1.6; transition: fill 110ms var(--ease); }
+.tl-playhead-handle:hover path, body.scrubbing .tl-playhead-handle path { fill: var(--amber); }
 .tl-playhead-handle-line { position: absolute; top: 22px; bottom: 0; left: 7px; width: 2px; background: var(--amber); }
-body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: none; }
+body.scrubbing, body.scrubbing * { cursor: move !important; user-select: none; }
 .tl-snapline { position: absolute; width: 1px; background: #fff; opacity: 0.7; z-index: 5; pointer-events: none; }
 
 /* ---------- avisos e modal ---------- */
