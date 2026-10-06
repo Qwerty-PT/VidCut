@@ -6,7 +6,7 @@ import { getThumb, onThumbsChange } from '../media';
 import { clamp, isTyping, timecode } from '../util';
 import { projectDuration, type Clip, type MediaItem, type Project, type Track } from '../../shared/types';
 import { MEDIA_DRAG_TYPE } from './MediaBin';
-import { splitAtPlayhead } from './Inspector';
+import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
 
 const HEADER_W = 156;
@@ -354,6 +354,8 @@ export const Timeline: React.FC = () => {
           <button className="icon-btn" title="Refazer (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" /></button>
           <span className="sep" />
           <button className="icon-btn" title="Dividir na cabeça de leitura (S)" onClick={() => { const r = splitAtPlayhead(project, selection); if (r) commit(() => r); }}><Icon name="split" /></button>
+          <button className="icon-btn" title="Eliminar à esquerda da cabeça de leitura (Q)" onClick={() => { const r = cutAtPlayhead(project, selection, 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } }}><Icon name="cutLeft" /></button>
+          <button className="icon-btn" title="Eliminar à direita da cabeça de leitura (W)" onClick={() => { const r = cutAtPlayhead(project, selection, 'right'); if (r) commit(() => r.project); }}><Icon name="cutRight" /></button>
           <button className="icon-btn" title="Apagar seleção (Delete)" disabled={!selection.length} onClick={() => commit((p) => deleteClips(p, selection), [])}><Icon name="trash" /></button>
           <span className="sep" />
           <button className={`icon-btn${snap ? ' on' : ''}`} title="Íman: encaixar em clips e na cabeça de leitura" onClick={() => setSnap(!snap)}><Icon name="magnet" /></button>
@@ -428,6 +430,12 @@ export const Timeline: React.FC = () => {
           <div className="ctx-menu" style={{ left: Math.min(menu.x, window.innerWidth - 256), top: Math.min(menu.y, window.innerHeight - 150) }} onPointerDown={(e) => e.stopPropagation()} role="menu">
             <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = splitAtPlayhead(project, [menu.clipId]); if (r) commit(() => r); })}>
               <Icon name="split" size={15} /> Dividir na cabeça de leitura <kbd>S</kbd>
+            </button>
+            <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = cutAtPlayhead(project, [menu.clipId], 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } })}>
+              <Icon name="cutLeft" size={15} /> Dividir e eliminar à esquerda <kbd>Q</kbd>
+            </button>
+            <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = cutAtPlayhead(project, [menu.clipId], 'right'); if (r) commit(() => r.project); })}>
+              <Icon name="cutRight" size={15} /> Dividir e eliminar à direita <kbd>W</kbd>
             </button>
             {canDetachAudio(project, menu.clipId) && (
               <button role="menuitem" onPointerDown={run(() => commit((p) => { const r = detachAudio(p, menu.clipId); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; }))}>

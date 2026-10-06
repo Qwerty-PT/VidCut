@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { canDetachAudio, changeFps, clipsAt, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
+import { canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
@@ -24,6 +24,22 @@ export function splitAtPlayhead(project: Project, selection: string[]): { projec
   if (!ids.length) return null;
   const r = splitClips(project, ids, f);
   return { project: r.project, select: r.created };
+}
+
+/**
+ * Dividir e eliminar à esquerda/direita na cabeça de leitura.
+ * Alvo: clips selecionados por baixo da cabeça de leitura, ou todos os que lá estão.
+ */
+export function cutAtPlayhead(project: Project, selection: string[], side: 'left' | 'right'): { project: Project; seekTo: number } | null {
+  const f = playhead.frame;
+  const underClips = clipsAt(project, f);
+  const under = underClips.map((c) => c.id);
+  const targets = selection.filter((id) => under.includes(id));
+  const ids = targets.length ? targets : under;
+  if (!ids.length) return null;
+  // ao eliminar à esquerda, o clip encosta ao início antigo: a cabeça de leitura vai para lá
+  const seekTo = side === 'left' ? Math.min(...underClips.filter((c) => ids.includes(c.id)).map((c) => c.start)) : f;
+  return { project: cutAtFrame(project, ids, f, side), seekTo };
 }
 
 /** Slider que agrupa o arrastar num único passo do histórico */
@@ -175,11 +191,17 @@ export const Inspector: React.FC = () => {
         </p>
 
         <div className="btn-row">
-          <button className="btn" onClick={() => { const r = splitAtPlayhead(project, [clip.id]); if (r) commit(() => r); }}>
+          <button className="btn" title="Dividir na cabeça de leitura (S)" onClick={() => { const r = splitAtPlayhead(project, [clip.id]); if (r) commit(() => r); }}>
             <Icon name="split" size={16} /> Dividir
           </button>
-          <button className="btn danger" onClick={() => commit((p) => deleteClips(p, [clip.id]), [])}>
-            <Icon name="trash" size={16} /> Apagar
+          <button className="btn icon-only" title="Eliminar à esquerda da cabeça de leitura (Q)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } }}>
+            <Icon name="cutLeft" size={16} />
+          </button>
+          <button className="btn icon-only" title="Eliminar à direita da cabeça de leitura (W)" onClick={() => { const r = cutAtPlayhead(project, [clip.id], 'right'); if (r) commit(() => r.project); }}>
+            <Icon name="cutRight" size={16} />
+          </button>
+          <button className="btn danger icon-only" title="Apagar clip (Delete)" onClick={() => commit((p) => deleteClips(p, [clip.id]), [])}>
+            <Icon name="trash" size={16} />
           </button>
         </div>
       </div>

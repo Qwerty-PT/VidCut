@@ -9,6 +9,8 @@ const P: Record<string, React.ReactNode> = {
   prev: <path d="M15 6l-6 6 6 6" />,
   next: <path d="M9 6l6 6-6 6" />,
   split: <><path d="M12 3v18" /><path d="M8 8l-4 4 4 4" /><path d="M16 8l4 4-4 4" /></>,
+  cutLeft: <><path d="M14 3v18" /><path d="M4 7l6 10M10 7L4 17" /><path d="M18 9l3 3-3 3" /></>,
+  cutRight: <><path d="M10 3v18" /><path d="M14 7l6 10M20 7l-6 10" /><path d="M6 9l-3 3 3 3" /></>,
   trash: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></>,
   undo: <><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 010 10h-3" /></>,
   redo: <><path d="M15 14l5-5-5-5" /><path d="M20 9H9a5 5 0 000 10h3" /></>,

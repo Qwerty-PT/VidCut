@@ -317,3 +317,37 @@ export function reattachAudio(p: Project, clipId: string): Project {
   project = updateClip(project, clipId, { audioDetached: false, detachedAudioId: undefined });
   return project;
 }
+
+/**
+ * Divide e elimina um dos lados (como o Q / W do CapCut).
+ * 'left' remove do início do clip até ao frame; 'right' remove do frame até ao fim.
+ * O espaço que fica é fechado na mesma pista: os clips seguintes andam para a esquerda.
+ */
+export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left' | 'right'): Project {
+  const set = new Set(ids);
+  return {
+    ...p,
+    tracks: p.tracks.map((t) => {
+      const target = t.clips.find((c) => set.has(c.id) && frame > c.start && frame < c.start + c.duration);
+      if (!target) return t;
+      const media = p.media.find((m) => m.id === target.mediaId);
+      const isImage = media?.kind === 'image';
+      const end0 = target.start + target.duration;
+      const removed = side === 'left' ? frame - target.start : end0 - frame;
+      const clips = t.clips.map((c) => {
+        if (c.id === target.id) {
+          const duration = c.duration - removed;
+          return {
+            ...c,
+            duration,
+            trimStart: side === 'left' && !isImage ? c.trimStart + removed : c.trimStart,
+            fadeIn: Math.min(side === 'left' ? 0 : c.fadeIn, duration),
+            fadeOut: Math.min(side === 'right' ? 0 : c.fadeOut, duration),
+          };
+        }
+        return c.start >= end0 ? { ...c, start: c.start - removed } : c;
+      });
+      return { ...t, clips };
+    }),
+  };
+}

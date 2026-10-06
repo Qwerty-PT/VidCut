@@ -9,7 +9,7 @@ import { isTyping } from './util';
 import { newProject, projectDuration, type MediaItem, type Project } from '../shared/types';
 import { MediaBin } from './components/MediaBin';
 import { Preview } from './components/Preview';
-import { Inspector, splitAtPlayhead } from './components/Inspector';
+import { Inspector, cutAtPlayhead, splitAtPlayhead } from './components/Inspector';
 import { Timeline } from './components/Timeline';
 import { ExportModal, type ExportState } from './components/ExportModal';
 import { Icon } from './components/Icon';
@@ -187,6 +187,13 @@ export const App: React.FC = () => {
           e.preventDefault();
           const r = splitAtPlayhead(s.project, s.selection);
           if (r) commit(() => r);
+          break;
+        }
+        case 'q': case 'Q': case 'w': case 'W': {
+          e.preventDefault();
+          const side = e.key.toLowerCase() === 'q' ? 'left' : 'right';
+          const r = cutAtPlayhead(s.project, s.selection, side);
+          if (r) { commit(() => r.project); playhead.seek(r.seekTo); }
           break;
         }
         case 'Delete': case 'Backspace':
