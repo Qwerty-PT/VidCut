@@ -44,6 +44,25 @@ export interface Clip {
   text?: TextContent;
   /** Posição, escala, rotação, recorte… (clips de vídeo e imagem) */
   transform?: ClipTransform;
+  /** Velocidade (1 = normal). A duração na timeline = frames da fonte / velocidade */
+  speed?: number;
+  /** Ajustes de cor e efeitos (vídeo e imagem) */
+  color?: ClipColor;
+}
+
+export interface ClipColor {
+  /** -100..100 */
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  /** -100 (frio) .. 100 (quente) */
+  temperature: number;
+  /** 0..100 */
+  sepia: number;
+  /** Desfocar, em px numa referência de 1080p (0..40) */
+  blur: number;
+  /** Vinheta 0..100 */
+  vignette: number;
 }
 
 export interface ClipTransform {
@@ -141,6 +160,8 @@ export function mediaUrl(mediaBase: string, path: string): string {
 }
 
 /** Duração da fonte em frames à taxa do projeto (Infinity para imagens) */
+export const clipSpeed = (c: Clip) => c.speed ?? 1;
+
 export function sourceFrames(media: MediaItem, fps: number): number {
   if (media.kind === 'image' || !media.durationSec) return Infinity;
   return Math.floor(media.durationSec * fps);

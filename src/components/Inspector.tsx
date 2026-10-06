@@ -5,7 +5,7 @@ import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row } from './Fields';
-import { AnimSection, TextFields, TransformSection } from './ClipPanels';
+import { AnimSection, ColorSection, SpeedSection, TextFields, TransformSection } from './ClipPanels';
 import type { Project, TransitionType } from '../../shared/types';
 import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
@@ -46,8 +46,11 @@ export function cutAtPlayhead(project: Project, selection: string[], side: 'left
   return { project: cutAtFrame(project, ids, f, side), seekTo };
 }
 
+type ClipTab = 'basic' | 'frame' | 'color' | 'anim';
+
 export const Inspector: React.FC = () => {
   const { state, commit, dispatch } = useEditor();
+  const [tab, setTab] = React.useState<ClipTab>('basic');
   const { project, selection } = state;
   const found = selection.length === 1 ? findClip(project, selection[0]) : null;
 
@@ -118,6 +121,8 @@ export const Inspector: React.FC = () => {
   const sec = (frames: number) => (frames / fps).toFixed(2).replace('.', ',');
   const isVisual = track.kind === 'video';
   const isText = !!clip.text;
+  const hasTabs = isVisual && !!media && media.kind !== 'audio';
+  const curTab: ClipTab = hasTabs ? tab : 'basic';
 
   const actions = (
     <div className="btn-row">
@@ -154,61 +159,72 @@ export const Inspector: React.FC = () => {
       <header className="panel-head">
         <h2 className="ellipsis" title={media?.name}>{media?.name ?? 'Clip'}</h2>
       </header>
+      {hasTabs && (
+        <div className="tabs" role="tablist">
+          {([['basic', 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={curTab === id} className={curTab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
+          ))}
+        </div>
+      )}
       <div className="inspector-body">
-        <dl className="meta">
-          <dt>Início</dt><dd>{timecode(clip.start, fps)}</dd>
-          <dt>Duração</dt><dd>{timecode(clip.duration, fps)}</dd>
-          {media?.kind !== 'image' && (<><dt>Corte inicial</dt><dd>{timecode(clip.trimStart, fps)}</dd></>)}
-          <dt>Pista</dt><dd>{track.name}</dd>
-        </dl>
+        {curTab === 'basic' && (
+          <>
+            <dl className="meta">
+              <dt>Início</dt><dd>{timecode(clip.start, fps)}</dd>
+              <dt>Duração</dt><dd>{timecode(clip.duration, fps)}</dd>
+              {media?.kind !== 'image' && (<><dt>Corte inicial</dt><dd>{timecode(clip.trimStart, fps)}</dd></>)}
+              <dt>Pista</dt><dd>{track.name}</dd>
+            </dl>
+            {actions}
 
-        {media?.kind === 'video' && isVisual && (
-          <div className="audio-box">
-            {clip.audioDetached ? (
-              <>
-                <p className="hint">O som deste vídeo está numa pista de áudio separada.</p>
-                <button className="btn block" onClick={() => commit((p) => reattachAudio(p, clip.id))}>
-                  <Icon name="link" size={16} /> Voltar a juntar o áudio
-                </button>
-              </>
-            ) : (
-              <button
-                className="btn block"
-                title="Passa o som para uma pista de áudio, para o editar à parte"
-                disabled={!canDetachAudio(project, clip.id)}
-                onClick={() => commit((p) => { const r = detachAudio(p, clip.id); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; })}
-              >
-                <Icon name="unlink" size={16} /> Separar áudio
-              </button>
+            {media?.kind === 'video' && isVisual && (
+              <div className="audio-box">
+                {clip.audioDetached ? (
+                  <>
+                    <p className="hint">O som deste vídeo está numa pista de áudio separada.</p>
+                    <button className="btn block" onClick={() => commit((p) => reattachAudio(p, clip.id))}>
+                      <Icon name="link" size={16} /> Voltar a juntar o áudio
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn block"
+                    title="Passa o som para uma pista de áudio, para o editar à parte"
+                    disabled={!canDetachAudio(project, clip.id)}
+                    onClick={() => commit((p) => { const r = detachAudio(p, clip.id); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; })}
+                  >
+                    <Icon name="unlink" size={16} /> Separar áudio
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+
+            {media?.kind !== 'image' && !clip.audioDetached && (
+              <Row label="Volume" hint={`${Math.round(clip.volume * 100)}%`}>
+                <Range min={0} max={2} step={0.01} value={clip.volume} apply={(v) => (p) => updateClip(p, clip.id, { volume: v })} />
+              </Row>
+            )}
+
+            <Row label="Fade in" hint={`${sec(clip.fadeIn)} s`}>
+              <Range min={0} max={maxFade} step={1} value={Math.min(clip.fadeIn, maxFade)} apply={(v) => (p) => updateClip(p, clip.id, { fadeIn: v })} />
+            </Row>
+            <Row label="Fade out" hint={`${sec(clip.fadeOut)} s`}>
+              <Range min={0} max={maxFade} step={1} value={Math.min(clip.fadeOut, maxFade)} apply={(v) => (p) => updateClip(p, clip.id, { fadeOut: v })} />
+            </Row>
+            <p className="hint">
+              {isVisual
+                ? clip.audioDetached
+                  ? 'No vídeo, o fade aplica-se à imagem. O som tem fades próprios na pista de áudio.'
+                  : 'No vídeo, o fade aplica-se à imagem (a partir do preto/fundo) e ao som do clip.'
+                : 'No áudio, o fade sobe/desce o volume.'}
+            </p>
+
+            {media && media.kind !== 'image' && <SpeedSection clip={clip} fps={fps} />}
+          </>
         )}
-
-        {isVisual && media && media.kind !== 'audio' && <TransformSection clip={clip} media={media} />}
-
-        {media?.kind !== 'image' && !clip.audioDetached && (
-          <Row label="Volume" hint={`${Math.round(clip.volume * 100)}%`}>
-            <Range min={0} max={2} step={0.01} value={clip.volume} apply={(v) => (p) => updateClip(p, clip.id, { volume: v })} />
-          </Row>
-        )}
-
-        <Row label="Fade in" hint={`${sec(clip.fadeIn)} s`}>
-          <Range min={0} max={maxFade} step={1} value={Math.min(clip.fadeIn, maxFade)} apply={(v) => (p) => updateClip(p, clip.id, { fadeIn: v })} />
-        </Row>
-        <Row label="Fade out" hint={`${sec(clip.fadeOut)} s`}>
-          <Range min={0} max={maxFade} step={1} value={Math.min(clip.fadeOut, maxFade)} apply={(v) => (p) => updateClip(p, clip.id, { fadeOut: v })} />
-        </Row>
-        <p className="hint">
-          {isVisual
-            ? clip.audioDetached
-              ? 'No vídeo, o fade aplica-se à imagem. O som tem fades próprios na pista de áudio.'
-              : 'No vídeo, o fade aplica-se à imagem (a partir do preto/fundo) e ao som do clip.'
-            : 'No áudio, o fade sobe/desce o volume.'}
-        </p>
-
-        {isVisual && <AnimSection clip={clip} isText={false} fps={fps} />}
-
-        {actions}
+        {curTab === 'frame' && media && <TransformSection clip={clip} media={media} />}
+        {curTab === 'color' && <ColorSection clip={clip} />}
+        {curTab === 'anim' && <AnimSection clip={clip} isText={false} fps={fps} />}
       </div>
     </aside>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { Clip, CompositionProps, MediaItem, Track } from './types';
-import { mediaUrl, sourceFrames } from './types';
+import type { Clip, ClipColor, CompositionProps, MediaItem, Track } from './types';
+import { clipSpeed, mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 import { animState, blockStyle } from './anim';
@@ -46,6 +46,40 @@ function clipLook(clip: Clip, act: ActiveTransitions, g: number) {
   return { opacity, volume, style: { transform: transforms.join(' ') || undefined, clipPath } as React.CSSProperties };
 }
 
+/** Filtro CSS para os ajustes de cor (brilho, contraste, saturação, sépia, desfocar) */
+function colorFilter(c: ClipColor | undefined, H: number): string | undefined {
+  if (!c) return undefined;
+  const parts: string[] = [];
+  if (c.brightness) parts.push(`brightness(${1 + c.brightness / 100})`);
+  if (c.contrast) parts.push(`contrast(${1 + c.contrast / 100})`);
+  if (c.saturation) parts.push(`saturate(${Math.max(0, 1 + c.saturation / 100)})`);
+  if (c.sepia) parts.push(`sepia(${c.sepia / 100})`);
+  if (c.blur) parts.push(`blur(${(c.blur * H) / 1080}px)`);
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+/** Camadas por cima da imagem: temperatura (tom quente/frio) e vinheta */
+const ColorOverlays: React.FC<{ color?: ClipColor }> = ({ color }) => {
+  if (!color) return null;
+  const t = color.temperature;
+  return (
+    <>
+      {t !== 0 && (
+        <div style={{
+          position: 'absolute', inset: 0, mixBlendMode: 'soft-light',
+          background: t > 0 ? `rgba(255, 138, 20, ${(t / 100) * 0.75})` : `rgba(20, 120, 255, ${(-t / 100) * 0.75})`,
+        }} />
+      )}
+      {color.vignette > 0 && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,${(color.vignette / 100) * 0.85}) 100%)`,
+        }} />
+      )}
+    </>
+  );
+};
+
 const VisualClip: React.FC<{
   clip: Clip; media: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
 }> = ({ clip, media, track, base, fps, act, from, pre, post }) => {
@@ -54,28 +88,39 @@ const VisualClip: React.FC<{
   const look = clipLook(clip, act, from + local);
   const src = mediaUrl(base, media.path);
   const tf = getTransform(clip);
-  const fill = mediaStyle(tf, baseSize(media, W, H, tf.fit));
   look.opacity *= tf.opacity;
   const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
+  const sp = clipSpeed(clip);
+  const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
+  // caixa posicionada/transformada com filtros de cor; a media enche a caixa
+  const frameBox = (children: React.ReactNode) => (
+    <div style={{ ...mediaStyle(tf, baseSize(media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
+      {children}
+      <ColorOverlays color={clip.color} />
+    </div>
+  );
 
   if (media.kind === 'image') {
     return (
       <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
-        <Img src={src} style={fill} />
+        {frameBox(<Img src={src} style={fill} />)}
       </AbsoluteFill>
     );
   }
 
-  // Frames extra da fonte antes/depois do clip (para a transição); se não houver, congela
+  // Frames extra da fonte antes/depois do clip (para a transição); se não houver, congela.
+  // trimStart está em frames da fonte; na timeline cada frame consome `sp` frames da fonte.
   const srcLen = sourceFrames(media, fps);
-  const preReal = clip.trimStart >= pre;
-  const postReal = clip.trimStart + clip.duration + post <= srcLen;
+  const preReal = clip.trimStart >= pre * sp;
+  const postReal = clip.trimStart + (clip.duration + post) * sp <= srcLen;
   const mainFrom = preReal ? 0 : pre;
   const mainDur = clip.duration + (preReal ? pre : 0) + (postReal ? post : 0);
-  const mainTrim = clip.trimStart - (preReal ? pre : 0);
+  const mainTrim = Math.round(clip.trimStart - (preReal ? pre * sp : 0));
+  const lastSrc = Math.max(0, Math.floor(clip.trimStart + clip.duration * sp) - 1);
 
   return (
     <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+      {frameBox(<>
       {pre > 0 && !preReal && (
         <Sequence from={0} durationInFrames={pre} layout="none">
           <Freeze frame={0}>
@@ -88,6 +133,7 @@ const VisualClip: React.FC<{
           src={src}
           trimBefore={mainTrim > 0 ? mainTrim : undefined}
           muted={vol === 0}
+          playbackRate={sp}
           volume={(f) => vol * clipLook(clip, act, from + mainFrom + f).volume}
           style={fill}
         />
@@ -95,10 +141,11 @@ const VisualClip: React.FC<{
       {post > 0 && !postReal && (
         <Sequence from={pre + clip.duration} durationInFrames={post} layout="none">
           <Freeze frame={0}>
-            <OffthreadVideo src={src} trimBefore={Math.max(0, clip.trimStart + clip.duration - 1)} muted style={fill} />
+            <OffthreadVideo src={src} trimBefore={lastSrc > 0 ? lastSrc : undefined} muted style={fill} />
           </Freeze>
         </Sequence>
       )}
+      </>)}
     </AbsoluteFill>
   );
 };
@@ -109,6 +156,7 @@ const AudioClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: st
     <Audio
       src={mediaUrl(base, media.path)}
       trimBefore={clip.trimStart > 0 ? clip.trimStart : undefined}
+      playbackRate={clipSpeed(clip)}
       volume={(f) => clip.volume * fadeFactor(f, clip.duration, clip.fadeIn, clip.fadeOut)}
     />
   );

@@ -1,6 +1,7 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, ClipTransform, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { Clip, ClipColor, ClipTransform, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import { clipSpeed } from '../shared/types';
 import { getTransform, isDefaultTransform } from '../shared/transform';
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
@@ -180,22 +181,23 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const others = found.track.clips.filter((c) => c.id !== origin.id);
   const isImage = !Number.isFinite(src);
   let { start, duration, trimStart } = origin;
+  const sp = clipSpeed(origin);
 
   if (edge === 'left') {
     const prevEnd = others.filter((c) => c.start + c.duration <= origin.start).reduce((m, c) => Math.max(m, c.start + c.duration), 0);
     let d = Math.round(deltaFrames);
     d = Math.max(d, prevEnd - origin.start); // não invade o clip anterior
     d = Math.max(d, -origin.start); // não passa do zero
-    if (!isImage) d = Math.max(d, -origin.trimStart); // não antes do início da fonte
+    if (!isImage) d = Math.max(d, -Math.floor(origin.trimStart / sp)); // não antes do início da fonte
     d = Math.min(d, origin.duration - 1); // mínimo 1 frame
     start = origin.start + d;
     duration = origin.duration - d;
-    trimStart = isImage ? 0 : origin.trimStart + d;
+    trimStart = isImage ? 0 : Math.max(0, Math.round(origin.trimStart + d * sp));
   } else {
     const nextStart = others.filter((c) => c.start >= origin.start + origin.duration).reduce((m, c) => Math.min(m, c.start), Infinity);
     let newDur = origin.duration + Math.round(deltaFrames);
     newDur = Math.min(newDur, nextStart - origin.start);
-    if (!isImage) newDur = Math.min(newDur, src - origin.trimStart);
+    if (!isImage) newDur = Math.min(newDur, Math.floor((src - origin.trimStart) / sp));
     duration = Math.max(1, newDur);
   }
   const fadeIn = Math.min(origin.fadeIn, duration);
@@ -253,7 +255,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
           transition: undefined,
           start: frame,
           duration: c.duration - leftDur,
-          trimStart: c.trimStart + leftDur,
+          trimStart: Math.round(c.trimStart + leftDur * clipSpeed(c)),
           fadeIn: 0,
           fadeOut: Math.min(c.fadeOut, c.duration - leftDur),
         };
@@ -317,6 +319,7 @@ export function detachAudio(p: Project, clipId: string): { project: Project; cli
     start: clip.start,
     duration: clip.duration,
     trimStart: clip.trimStart,
+    speed: clip.speed,
     volume: clip.volume,
     fadeIn: clip.fadeIn,
     fadeOut: clip.fadeOut,
@@ -358,7 +361,7 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
           return {
             ...c,
             duration,
-            trimStart: side === 'left' && !isImage ? c.trimStart + removed : c.trimStart,
+            trimStart: side === 'left' && !isImage ? Math.round(c.trimStart + removed * clipSpeed(c)) : c.trimStart,
             fadeIn: Math.min(side === 'left' ? 0 : c.fadeIn, duration),
             fadeOut: Math.min(side === 'right' ? 0 : c.fadeOut, duration),
           };
@@ -432,4 +435,47 @@ export function updateTransform(p: Project, clipId: string, patch: Partial<ClipT
   const cur = getTransform(f.clip);
   const next: ClipTransform = { ...cur, ...patch, crop: { ...cur.crop, ...patch.crop } };
   return updateClip(p, clipId, { transform: isDefaultTransform(next) ? undefined : next });
+}
+
+export const SPEED_MIN = 0.25;
+export const SPEED_MAX = 4;
+
+/**
+ * Muda a velocidade mantendo o mesmo excerto da fonte: a duração na timeline encolhe/estica.
+ * Os clips seguintes na mesma pista são empurrados (ou puxados) para não haver sobreposição nem buracos novos.
+ */
+export function setSpeed(p: Project, clipId: string, speed: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const old = clipSpeed(f.clip);
+  const sp = Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(speed * 100) / 100));
+  if (sp === old) return p;
+  const duration = Math.max(1, Math.round((f.clip.duration * old) / sp));
+  const delta = duration - f.clip.duration;
+  const end0 = f.clip.start + f.clip.duration;
+  return {
+    ...p,
+    tracks: p.tracks.map((t) => {
+      if (t.id !== f.track.id) return t;
+      return {
+        ...t,
+        clips: t.clips.map((c) => {
+          if (c.id === clipId) {
+            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration) };
+          }
+          return c.start >= end0 ? { ...c, start: Math.max(0, c.start + delta) } : c;
+        }),
+      };
+    }),
+  };
+}
+
+export const DEFAULT_COLOR: ClipColor = { brightness: 0, contrast: 0, saturation: 0, temperature: 0, sepia: 0, blur: 0, vignette: 0 };
+
+export function updateColor(p: Project, clipId: string, patch: Partial<ClipColor>): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const next = { ...DEFAULT_COLOR, ...f.clip.color, ...patch };
+  const isDefault = (Object.keys(DEFAULT_COLOR) as (keyof ClipColor)[]).every((k) => next[k] === 0);
+  return updateClip(p, clipId, { color: isDefault ? undefined : next });
 }

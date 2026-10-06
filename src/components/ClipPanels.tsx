@@ -1,9 +1,10 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { updateClip, updateText, updateTransform } from '../ops';
+import { DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
 import { Range, Row, Segmented } from './Fields';
 import { Icon } from './Icon';
-import type { AnimPreset, Clip, ClipAnim, MediaItem, TextContent } from '../../shared/types';
+import type { AnimPreset, Clip, ClipAnim, ClipColor, MediaItem, TextContent } from '../../shared/types';
+import { clipSpeed } from '../../shared/types';
 import { LAYOUT_PRESETS, applyLayoutPreset, getTransform, isDefaultTransform } from '../../shared/transform';
 import { ANIM_PRESETS } from '../../shared/anim';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
@@ -234,6 +235,76 @@ export const TransformSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ c
         {cropRange('bottom', 'Baixo')}
         {cropRange('left', 'Esquerda')}
         {cropRange('right', 'Direita')}
+      </details>
+    </section>
+  );
+};
+
+const fmtSpeed = (v: number) => `${v.toFixed(v < 1 ? 2 : 1).replace('.', ',')}×`;
+
+/** Velocidade do clip (vídeo e áudio) */
+export const SpeedSection: React.FC<{ clip: Clip; fps: number }> = ({ clip, fps }) => {
+  const { commit } = useEditor();
+  const sp = clipSpeed(clip);
+  const chips = [0.5, 1, 1.5, 2, 3];
+  return (
+    <section className="section">
+      <h3 className="section-title">Velocidade</h3>
+      <Row label="Velocidade" hint={`${fmtSpeed(sp)} · ${(clip.duration / fps).toFixed(1).replace('.', ',')} s`}>
+        <Range min={Math.log2(SPEED_MIN)} max={Math.log2(SPEED_MAX)} step={0.01} value={Math.log2(sp)} apply={(v) => (p) => setSpeed(p, clip.id, 2 ** v)} />
+      </Row>
+      <div className="chip-row">
+        {chips.map((c) => (
+          <button key={c} className={`chip${Math.abs(c - sp) < 0.005 ? ' on' : ''}`} onClick={() => commit((p) => setSpeed(p, clip.id, c))}>{fmtSpeed(c)}</button>
+        ))}
+      </div>
+      <p className="hint">Mantém o mesmo excerto: o clip fica mais curto ou mais comprido e os clips seguintes da pista acompanham.{clip.audioDetached ? ' O áudio separado não muda: ajusta-o na pista de áudio.' : ''}</p>
+    </section>
+  );
+};
+
+const COLOR_PRESETS: { label: string; c: Partial<ClipColor> }[] = [
+  { label: 'Original', c: {} },
+  { label: 'Vívido', c: { saturation: 30, contrast: 12 } },
+  { label: 'Quente', c: { temperature: 35, saturation: 8 } },
+  { label: 'Frio', c: { temperature: -35 } },
+  { label: 'P&B', c: { saturation: -100, contrast: 12 } },
+  { label: 'Sépia', c: { sepia: 80, contrast: -5 } },
+  { label: 'Desbotado', c: { contrast: -18, saturation: -30, brightness: 6 } },
+  { label: 'Cinema', c: { contrast: 18, saturation: -12, temperature: -12, vignette: 35 } },
+  { label: 'Vintage', c: { sepia: 35, contrast: -10, saturation: -15, vignette: 45 } },
+];
+
+/** Ajustes de cor e efeitos (vídeo e imagem) */
+export const ColorSection: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { commit } = useEditor();
+  const c = { ...DEFAULT_COLOR, ...clip.color };
+  const same = (pc: Partial<ClipColor>) => (Object.keys(DEFAULT_COLOR) as (keyof ClipColor)[]).every((k) => (pc[k] ?? 0) === c[k]);
+  const slider = (key: keyof ClipColor, label: string, min: number, max: number, unit = '') => (
+    <Row label={label} hint={`${c[key] > 0 && min < 0 ? '+' : ''}${c[key]}${unit}`}>
+      <Range min={min} max={max} step={1} value={c[key]} apply={(v) => (p) => updateColor(p, clip.id, { [key]: v })} />
+    </Row>
+  );
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h3 className="section-title">Cor e efeitos</h3>
+        <button className="btn tiny" disabled={!clip.color} onClick={() => commit((p) => updateClip(p, clip.id, { color: undefined }))}>Repor</button>
+      </div>
+      <div className="chip-row filters">
+        {COLOR_PRESETS.map((pr) => (
+          <button key={pr.label} className={`chip${same(pr.c) ? ' on' : ''}`} onClick={() => commit((p) => updateColor(p, clip.id, { ...DEFAULT_COLOR, ...pr.c }))}>{pr.label}</button>
+        ))}
+      </div>
+      {slider('brightness', 'Brilho', -100, 100)}
+      {slider('contrast', 'Contraste', -100, 100)}
+      {slider('saturation', 'Saturação', -100, 100)}
+      {slider('temperature', 'Temperatura', -100, 100)}
+      <details className="crop-box">
+        <summary>Efeitos</summary>
+        {slider('blur', 'Desfocar', 0, 40)}
+        {slider('vignette', 'Vinheta', 0, 100)}
+        {slider('sepia', 'Sépia', 0, 100)}
       </details>
     </section>
   );
