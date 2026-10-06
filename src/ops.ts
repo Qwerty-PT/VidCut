@@ -386,6 +386,7 @@ export function defaultText(): TextContent {
     y: 80, // terço inferior
     maxWidth: 80,
     background: null,
+    bgOpacity: 0.85,
     shadow: true,
   };
 }

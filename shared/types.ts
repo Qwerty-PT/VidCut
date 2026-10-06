@@ -73,6 +73,8 @@ export interface TextContent {
   maxWidth: number;
   /** Caixa de fundo (null = sem caixa) */
   background: string | null;
+  /** Opacidade da caixa de fundo, 0..1 (por defeito 0,85) */
+  bgOpacity?: number;
   shadow: boolean;
 }
 

@@ -105,6 +105,11 @@ export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, 
           Sombra
         </label>
       </div>
+      {text.background !== null && (
+        <Row label="Opacidade da caixa" hint={`${Math.round((text.bgOpacity ?? 0.85) * 100)}%`}>
+          <Range min={0} max={1} step={0.01} value={text.bgOpacity ?? 0.85} apply={(v) => (p) => updateText(p, clip.id, { bgOpacity: v })} />
+        </Row>
+      )}
     </>
   );
 };

@@ -91,7 +91,7 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
             whiteSpace: 'pre-wrap',
             overflowWrap: 'break-word',
             textShadow: shadow,
-            background: text.background ? hexToRgba(text.background, 0.85) : undefined,
+            background: text.background ? hexToRgba(text.background, text.bgOpacity ?? 0.85) : undefined,
             padding: text.background ? `${0.25 * fontSize}px ${0.45 * fontSize}px` : 0,
             borderRadius: text.background ? 0.18 * fontSize : 0,
           }}
