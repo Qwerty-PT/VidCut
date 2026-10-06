@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { addClip, addTrack, deleteClips, findClip, moveClip, removeTrack, trimClip, updateTrack } from '../ops';
+import { addClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, trimClip, updateTrack } from '../ops';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
 import { clamp, isTyping, timecode } from '../util';
@@ -45,6 +45,9 @@ export const Timeline: React.FC = () => {
   const [snapLine, setSnapLine] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [, forceThumbs] = useState(0);
+  const [view, setView] = useState({ left: 0, width: 0 }); // scrollLeft e largura visível da área dos clips
+  const [menu, setMenu] = useState<{ x: number; y: number; clipId: string } | null>(null);
+  const pendingScroll = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const projectRef = useRef(project);
@@ -54,7 +57,8 @@ export const Timeline: React.FC = () => {
 
   const z = pps / fps; // px por frame
   const duration = projectDuration(project);
-  const contentFrames = Math.max(duration + fps * 10, Math.ceil(((scrollRef.current?.clientWidth ?? 1200) - HEADER_W) / z));
+  const visW = Math.max(1, (view.width || 1200 - HEADER_W));
+  const contentFrames = Math.max(duration + fps * 10, Math.ceil(visW / z));
   const contentW = HEADER_W + contentFrames * z;
   const mediaById = useMemo(() => new Map(project.media.map((m) => [m.id, m])), [project.media]);
 
@@ -82,18 +86,34 @@ export const Timeline: React.FC = () => {
     const r = el.getBoundingClientRect();
     const ax = anchorClientX ?? r.left + HEADER_W + (playhead.frame * (pps / fps)) - el.scrollLeft;
     const frameAtAnchor = (ax - r.left - HEADER_W + el.scrollLeft) / (pps / fps);
+    pendingScroll.current = Math.max(0, frameAtAnchor * (nextPps / fps) - (ax - r.left - HEADER_W));
     setPps(nextPps);
-    requestAnimationFrame(() => {
-      el.scrollLeft = Math.max(0, frameAtAnchor * (nextPps / fps) - (ax - r.left - HEADER_W));
-    });
   }, [pps, fps]);
+
+  // aplica o scroll depois de a largura do conteúdo mudar com o zoom
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el && pendingScroll.current !== null) { el.scrollLeft = pendingScroll.current; pendingScroll.current = null; }
+    if (el) setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W });
+  }, [pps]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W });
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', update); ro.disconnect(); };
+  }, []);
 
   const zoomFit = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     const avail = el.clientWidth - HEADER_W - 40;
+    pendingScroll.current = 0;
     setPps(clamp(avail / (duration / fps), MIN_PPS, MAX_PPS));
-    el.scrollLeft = 0;
   }, [duration, fps]);
 
   useEffect(() => {
@@ -110,7 +130,8 @@ export const Timeline: React.FC = () => {
   const onWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      zoomTo(pps * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX);
+      // trackpad (pinça) manda deltas pequenos; roda do rato manda deltas grandes
+      zoomTo(pps * Math.exp(-clamp(e.deltaY, -40, 40) * 0.012), e.clientX);
     }
   };
 
@@ -192,6 +213,71 @@ export const Timeline: React.FC = () => {
       gesture.current = null;
       setSnapLine(null);
     };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const onClipMenu = (e: React.MouseEvent, clip: Clip) => {
+    e.preventDefault();
+    if (!selection.includes(clip.id)) dispatch({ type: 'select', ids: [clip.id] });
+    setMenu({ x: e.clientX, y: e.clientY, clipId: clip.id });
+  };
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', close);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', onKey); window.removeEventListener('blur', close); };
+  }, [menu]);
+
+  // ---------- barra de navegação (scroll + zoom pelas pegas) ----------
+  const navRef = useRef<HTMLDivElement>(null);
+  const laneW = contentFrames * z;
+  const thumbL = laneW > 0 ? view.left / laneW : 0;
+  const thumbW = laneW > 0 ? Math.min(1, visW / laneW) : 1;
+
+  const onNavDown = (e: React.PointerEvent, part: 'thumb' | 'left' | 'right' | 'track') => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = scrollRef.current;
+    const bar = navRef.current;
+    if (!el || !bar) return;
+    const barW = bar.getBoundingClientRect().width;
+    const T = contentFrames; // escala fixa durante o gesto
+    const fpp = T / barW; // frames por pixel da barra
+    const vis = el.clientWidth - HEADER_W;
+    const start0 = el.scrollLeft / z;
+    const end0 = (el.scrollLeft + vis) / z;
+    const x0 = e.clientX;
+    const minSpan = (vis / MAX_PPS) * fps;
+    const maxSpan = (vis / MIN_PPS) * fps;
+
+    if (part === 'track') {
+      // clique fora do polegar: centra a vista nesse ponto
+      const r = bar.getBoundingClientRect();
+      const f = (e.clientX - r.left) * fpp;
+      el.scrollLeft = Math.max(0, (f - (end0 - start0) / 2) * z);
+      return;
+    }
+    const move = (ev: PointerEvent) => {
+      const df = (ev.clientX - x0) * fpp;
+      if (part === 'thumb') {
+        el.scrollLeft = Math.max(0, (start0 + df) * z);
+        return;
+      }
+      let a = start0, b = end0;
+      if (part === 'right') b = clamp(end0 + df, a + minSpan, a + maxSpan);
+      else a = Math.max(0, clamp(start0 + df, b - maxSpan, b - minSpan));
+      const nextPps = clamp(vis / ((b - a) / fps), MIN_PPS, MAX_PPS);
+      pendingScroll.current = a * (nextPps / fps);
+      setPps(nextPps);
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('dragging-nav'); };
+    document.body.classList.add('dragging-nav');
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
@@ -286,6 +372,7 @@ export const Timeline: React.FC = () => {
               selection={selection}
               dropActive={dropTarget === track.id}
               onClipDown={onClipDown}
+              onClipMenu={onClipMenu}
               onLaneDown={onLaneDown}
               dragProps={dragProps(track.id, track.id)}
               onToggle={(patch) => commit((p) => updateTrack(p, track.id, patch))}
@@ -307,6 +394,44 @@ export const Timeline: React.FC = () => {
           <Playhead z={z} height={RULER_H + tracksHeight} />
         </div>
       </div>
+
+      <div className="tl-nav">
+        <div className="tl-nav-label" style={{ width: HEADER_W }}>{timecode(Math.round(visW / z), fps).replace(/\.\d+$/, '')} visíveis</div>
+        <div className="tl-nav-track" ref={navRef} onPointerDown={(e) => onNavDown(e, 'track')} title="Arrasta para navegar; arrasta as pontas para aproximar/afastar">
+          <div className="tl-nav-thumb" style={{ left: `${thumbL * 100}%`, width: `${thumbW * 100}%` }} onPointerDown={(e) => onNavDown(e, 'thumb')}>
+            <div className="tl-nav-grip left" onPointerDown={(e) => onNavDown(e, 'left')} title="Arrasta para aproximar/afastar" />
+            <div className="tl-nav-grip right" onPointerDown={(e) => onNavDown(e, 'right')} title="Arrasta para aproximar/afastar" />
+          </div>
+        </div>
+      </div>
+
+      {menu && (() => {
+        const f = findClip(project, menu.clipId);
+        if (!f) return null;
+        const under = playhead.frame > f.clip.start && playhead.frame < f.clip.start + f.clip.duration;
+        const run = (fn: () => void) => (e: React.PointerEvent) => { e.stopPropagation(); fn(); setMenu(null); };
+        return (
+          <div className="ctx-menu" style={{ left: Math.min(menu.x, window.innerWidth - 256), top: Math.min(menu.y, window.innerHeight - 150) }} onPointerDown={(e) => e.stopPropagation()} role="menu">
+            <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = splitAtPlayhead(project, [menu.clipId]); if (r) commit(() => r); })}>
+              <Icon name="split" size={15} /> Dividir na cabeça de leitura <kbd>S</kbd>
+            </button>
+            {canDetachAudio(project, menu.clipId) && (
+              <button role="menuitem" onPointerDown={run(() => commit((p) => { const r = detachAudio(p, menu.clipId); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; }))}>
+                <Icon name="unlink" size={15} /> Separar áudio
+              </button>
+            )}
+            {f.clip.audioDetached && (
+              <button role="menuitem" onPointerDown={run(() => commit((p) => reattachAudio(p, menu.clipId)))}>
+                <Icon name="link" size={15} /> Voltar a juntar o áudio
+              </button>
+            )}
+            <div className="ctx-sep" />
+            <button role="menuitem" className="danger" onPointerDown={run(() => commit((p) => deleteClips(p, selection.includes(menu.clipId) ? selection : [menu.clipId]), []))}>
+              <Icon name="trash" size={15} /> Apagar <kbd>Del</kbd>
+            </button>
+          </div>
+        );
+      })()}
     </section>
   );
 };
@@ -324,13 +449,14 @@ interface TrackRowProps {
   selection: string[];
   dropActive: boolean;
   onClipDown: (e: React.PointerEvent, clip: Clip, track: Track, mode: 'move' | 'left' | 'right') => void;
+  onClipMenu: (e: React.MouseEvent, clip: Clip) => void;
   onLaneDown: (e: React.PointerEvent) => void;
   dragProps: Record<string, unknown>;
   onToggle: (patch: Partial<Track>) => void;
   onRemove: () => void;
 }
 
-const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onLaneDown, dragProps, onToggle, onRemove, project }) => {
+const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onLaneDown, dragProps, onToggle, onRemove, project }) => {
   const isVideo = track.kind === 'video';
   return (
     <div className={`tl-row kind-${track.kind}`} style={{ height: TRACK_H[track.kind] }} data-track-id={track.id} data-track-kind={track.kind}>
@@ -359,9 +485,11 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
               key={clip.id}
               clip={clip}
               media={media}
+              trackKind={track.kind}
               z={z}
               selected={selection.includes(clip.id)}
               onDown={(e, mode) => onClipDown(e, clip, track, mode)}
+              onMenu={(e) => onClipMenu(e, clip)}
             />
           );
         })}
@@ -373,13 +501,16 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
 const ClipView: React.FC<{
   clip: Clip;
   media?: MediaItem;
+  trackKind: Track['kind'];
   z: number;
   selected: boolean;
   onDown: (e: React.PointerEvent, mode: 'move' | 'left' | 'right') => void;
-}> = React.memo(({ clip, media, z, selected, onDown }) => {
+  onMenu: (e: React.MouseEvent) => void;
+}> = React.memo(({ clip, media, trackKind, z, selected, onDown, onMenu }) => {
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
-  const kind = media?.kind ?? 'video';
+  // um vídeo numa pista de áudio (som separado) desenha-se como áudio
+  const kind = trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
@@ -387,6 +518,7 @@ const ClipView: React.FC<{
       className={`clip kind-${kind}${selected ? ' selected' : ''}${media ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       onPointerDown={(e) => onDown(e, 'move')}
+      onContextMenu={onMenu}
       title={media?.name}
     >
       {kind === 'audio' && <div className="clip-wave" />}
@@ -397,7 +529,8 @@ const ClipView: React.FC<{
         </svg>
       )}
       {w > 36 && <span className="clip-name">{media?.name ?? 'Ficheiro em falta'}</span>}
-      {clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
+      {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
+      {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
     </div>

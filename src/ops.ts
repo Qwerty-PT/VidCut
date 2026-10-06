@@ -225,6 +225,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
         const right: Clip = {
           ...c,
           id: uid('c'),
+          detachedAudioId: undefined,
           start: frame,
           duration: c.duration - leftDur,
           trimStart: c.trimStart + leftDur,
@@ -261,4 +262,50 @@ export function changeFps(p: Project, fps: number): Project {
       })),
     })),
   };
+}
+
+/** Pode separar o som deste clip? (clip de vídeo, numa pista de vídeo, ainda com som) */
+export function canDetachAudio(p: Project, clipId: string): boolean {
+  const f = findClip(p, clipId);
+  if (!f || f.track.kind !== 'video' || f.clip.audioDetached) return false;
+  return p.media.find((m) => m.id === f.clip.mediaId)?.kind === 'video';
+}
+
+/**
+ * Separa o som de um clip de vídeo para uma pista de áudio, alinhado ao frame.
+ * O clip de vídeo fica sem som; o novo clip de áudio herda volume e fades.
+ */
+export function detachAudio(p: Project, clipId: string): { project: Project; clipId: string | null } {
+  if (!canDetachAudio(p, clipId)) return { project: p, clipId: null };
+  const { clip } = findClip(p, clipId)!;
+  let project = p;
+  let track = p.tracks.find((t) => t.kind === 'audio' && overlaps(t, clip.start, clip.duration).length === 0);
+  if (!track) {
+    const r = addTrack(project, 'audio');
+    project = r.project;
+    track = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  const audio: Clip = {
+    id: uid('c'),
+    mediaId: clip.mediaId,
+    start: clip.start,
+    duration: clip.duration,
+    trimStart: clip.trimStart,
+    volume: clip.volume,
+    fadeIn: clip.fadeIn,
+    fadeOut: clip.fadeOut,
+  };
+  const trackId = track.id;
+  project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, audio]) }));
+  project = updateClip(project, clipId, { audioDetached: true, detachedAudioId: audio.id });
+  return { project, clipId: audio.id };
+}
+
+/** Volta a pôr o som no clip de vídeo e apaga o clip de áudio separado (se ainda existir). */
+export function reattachAudio(p: Project, clipId: string): Project {
+  const f = findClip(p, clipId);
+  if (!f || !f.clip.audioDetached) return p;
+  let project = f.clip.detachedAudioId ? deleteClips(p, [f.clip.detachedAudioId]) : p;
+  project = updateClip(project, clipId, { audioDetached: false, detachedAudioId: undefined });
+  return project;
 }

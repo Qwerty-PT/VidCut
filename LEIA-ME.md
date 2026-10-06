@@ -10,7 +10,9 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Timeline multi-pista (vídeo e áudio), pistas de vídeo de cima ficam por cima da imagem
 - Mover clips (também entre pistas do mesmo tipo), aparar pelas pontas, dividir, apagar
 - Íman: encaixa nas pontas de outros clips e na cabeça de leitura
-- Zoom da timeline (botões, slider, `Ctrl` + roda, `+` / `-` / `0`)
+- Zoom da timeline: arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`
+- Barra de navegação: arrastar o meio para andar na timeline, clicar fora para saltar
+- **Separar áudio** de um clip de vídeo (botão direito no clip, ou no painel da direita): o som passa para uma pista de áudio, alinhado ao frame, e pode ser movido, cortado e ter volume e fades próprios. "Voltar a juntar o áudio" desfaz a separação
 - Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume
 - Volume por clip (0–200 %), silenciar e esconder pistas
 - Desfazer / refazer (arrastar um clip ou um slider conta como um só passo)
@@ -63,6 +65,8 @@ Notas:
 | `Ctrl+I` / `Ctrl+E` | Importar media / exportar vídeo |
 | `Shift` ou `Ctrl` + clique | Seleção múltipla |
 | Duplo clique na media | Adiciona na cabeça de leitura |
+| Botão direito num clip | Dividir, separar/juntar áudio, apagar |
+| Pinça no trackpad | Zoom da timeline |
 
 ## Estrutura
 
@@ -101,9 +105,10 @@ O projeto é um único JSON. Todos os tempos estão em **frames** à taxa do pro
 ## Testes feitos
 
 - `tsc` sem erros e build completo (Vite + bundle Remotion)
-- Operações de edição: adicionar, sobreposição, aparar com limites, dividir, mover, apagar, mudar fps
+- Operações de edição: adicionar, sobreposição, aparar com limites, dividir, mover, apagar, mudar fps, separar e voltar a juntar áudio
+- Export com áudio separado: o vídeo fica mudo e o som separado toca na nova posição
 - Export real (Node): corte inicial exato ao frame, fades de imagem e áudio, imagem sobreposta, volume a 50 %
-- App Electron real (Linux, ecrã virtual): importar 4 ficheiros, adicionar à timeline, exportar MP4 1080p
+- App Electron real (Linux, ecrã virtual): importar 4 ficheiros, adicionar à timeline, exportar MP4 1080p, separar áudio pelo menu de contexto, zoom pela barra de navegação
 
 Para repetir o teste de export: `sh scripts/make-test-media.sh && node scripts/test-render.cjs`
 
@@ -112,6 +117,7 @@ Para repetir o teste de export: `sh scripts/make-test-media.sh && node scripts/t
 - A pré-visualização usa o leitor de vídeo do Chromium: H.264, VP8/VP9 e AV1 funcionam; HEVC/H.265 e alguns MKV podem não pré-visualizar (o export usa ffmpeg e lida com mais formatos)
 - Sem forma de onda real nos clips de áudio (é um padrão gráfico)
 - Seleção múltipla só serve para apagar/dividir; mover arrasta um clip de cada vez
+- Depois de separar, vídeo e áudio ficam independentes (mover um não move o outro). Se dividires o vídeo depois de separar, só a metade da esquerda volta a juntar o áudio automaticamente
 - A app só funciona dentro do Electron (no browser mostra um aviso)
 
 ## Licença do Remotion

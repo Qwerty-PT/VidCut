@@ -24,6 +24,8 @@ const P: Record<string, React.ReactNode> = {
   minus: <path d="M5 12h14" />,
   zoomFit: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></>,
   magnet: <><path d="M6 4v8a6 6 0 0012 0V4" /><path d="M6 8h4M14 8h4" /><path d="M10 4v8a2 2 0 004 0V4" /></>,
+  link: <><path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1" /></>,
+  unlink: <><path d="M15.5 13.5l3-3a4 4 0 00-5.66-5.66l-1 1" /><path d="M8.5 10.5l-3 3a4 4 0 005.66 5.66l1-1" /><path d="M4 4l16 16" /></>,
   x: <path d="M6 6l12 12M18 6L6 18" />,
   film: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4" /></>,
   music: <><path d="M9 18V6l11-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="17.5" cy="16" r="2.5" /></>,

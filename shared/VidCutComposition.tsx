@@ -10,7 +10,7 @@ const VisualClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: s
   const frame = useCurrentFrame(); // relativo ao início da Sequence
   const opacity = fadeFactor(frame, clip.duration, clip.fadeIn, clip.fadeOut);
   const src = mediaUrl(base, media.path);
-  const vol = track.muted ? 0 : clip.volume;
+  const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
 
   return (
     <AbsoluteFill style={{ opacity }}>

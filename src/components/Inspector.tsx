@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { changeFps, clipsAt, deleteClips, findClip, splitClips, updateClip } from '../ops';
+import { canDetachAudio, changeFps, clipsAt, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
@@ -132,7 +132,29 @@ export const Inspector: React.FC = () => {
           <dt>Pista</dt><dd>{track.name}</dd>
         </dl>
 
-        {media?.kind !== 'image' && (
+        {media?.kind === 'video' && isVisual && (
+          <div className="audio-box">
+            {clip.audioDetached ? (
+              <>
+                <p className="hint">O som deste vídeo está numa pista de áudio separada.</p>
+                <button className="btn block" onClick={() => commit((p) => reattachAudio(p, clip.id))}>
+                  <Icon name="link" size={16} /> Voltar a juntar o áudio
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn block"
+                title="Passa o som para uma pista de áudio, para o editar à parte"
+                disabled={!canDetachAudio(project, clip.id)}
+                onClick={() => commit((p) => { const r = detachAudio(p, clip.id); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; })}
+              >
+                <Icon name="unlink" size={16} /> Separar áudio
+              </button>
+            )}
+          </div>
+        )}
+
+        {media?.kind !== 'image' && !clip.audioDetached && (
           <Row label="Volume" hint={`${Math.round(clip.volume * 100)}%`}>
             <Range min={0} max={2} step={0.01} value={clip.volume} apply={(v) => (p) => updateClip(p, clip.id, { volume: v })} />
           </Row>
@@ -146,7 +168,9 @@ export const Inspector: React.FC = () => {
         </Row>
         <p className="hint">
           {isVisual
-            ? 'No vídeo, o fade aplica-se à imagem (a partir do preto/fundo) e ao som do clip.'
+            ? clip.audioDetached
+              ? 'No vídeo, o fade aplica-se à imagem. O som tem fades próprios na pista de áudio.'
+              : 'No vídeo, o fade aplica-se à imagem (a partir do preto/fundo) e ao som do clip.'
             : 'No áudio, o fade sobe/desce o volume.'}
         </p>
 

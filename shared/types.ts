@@ -31,6 +31,10 @@ export interface Clip {
   /** Fade in / fade out em frames (vídeo: opacidade; áudio: volume) */
   fadeIn: number;
   fadeOut: number;
+  /** Clips de vídeo: o som foi separado para uma pista de áudio (o clip de vídeo fica sem som) */
+  audioDetached?: boolean;
+  /** Id do clip de áudio criado ao separar (para voltar a juntar) */
+  detachedAudioId?: string;
 }
 
 export interface Track {
