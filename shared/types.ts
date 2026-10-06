@@ -48,6 +48,20 @@ export interface Clip {
   speed?: number;
   /** Ajustes de cor e efeitos (vídeo e imagem) */
   color?: ClipColor;
+  /** Keyframes de posição/escala/rotação/opacidade (frames relativos ao início do clip) */
+  keyframes?: Keyframe[];
+}
+
+export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
+export type KfEasing = 'linear' | 'productive' | 'expressive' | 'hold';
+
+export interface Keyframe {
+  id: string;
+  /** Frame relativo ao início do clip */
+  frame: number;
+  values: Partial<Record<KfProp, number>>;
+  /** Curva do segmento que começa neste keyframe */
+  easing: KfEasing;
 }
 
 export interface ClipColor {

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { addClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { moveKeyframe, addClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
 import { clamp, isTyping, timecode } from '../util';
-import { projectDuration, type Clip, type MediaItem, type Project, type Track } from '../../shared/types';
+import { projectDuration, type Clip, type Keyframe, type MediaItem, type Project, type Track } from '../../shared/types';
 import { MEDIA_DRAG_TYPE } from './MediaBin';
 import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
@@ -303,6 +303,31 @@ export const Timeline: React.FC = () => {
     window.addEventListener('pointerup', up);
   };
 
+  // losangos de keyframe: clicar salta para o keyframe; arrastar move-o
+  const onKeyframeDown = (e: React.PointerEvent, clip: Clip, kf: Keyframe) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    playhead.pause();
+    playhead.seek(clip.start + kf.frame);
+    const x0 = e.clientX;
+    let started = false;
+    const move = (ev: PointerEvent) => {
+      const df = Math.round((ev.clientX - x0) / z);
+      if (!started) { if (Math.abs(ev.clientX - x0) < 3) return; started = true; dispatch({ type: 'beginGesture' }); }
+      const fr = clamp(kf.frame + df, 0, clip.duration - 1);
+      dispatch({ type: 'gesture', fn: (p) => moveKeyframe(p, clip.id, kf.id, fr) });
+      playhead.seek(clip.start + fr);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (started) dispatch({ type: 'endGesture' });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   const onLaneDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     dispatch({ type: 'select', ids: [] });
@@ -409,6 +434,7 @@ export const Timeline: React.FC = () => {
               dropActive={dropTarget === track.id}
               onClipDown={onClipDown}
               onClipMenu={onClipMenu}
+              onKeyframeDown={onKeyframeDown}
               onSelectTransition={(id) => { playhead.pause(); dispatch({ type: 'select', ids: [transitionSelId(id)] }); }}
               onAddTransition={(clip, prev) => commit((p) => setTransition(p, clip.id, { type: 'dissolve', duration: clamp(Math.round(fps * 0.5), 2, maxTransition(prev, clip)) }), [transitionSelId(clip.id)])}
               onLaneDown={onLaneDown}
@@ -517,6 +543,7 @@ interface TrackRowProps {
   dropActive: boolean;
   onClipDown: (e: React.PointerEvent, clip: Clip, track: Track, mode: ClipMode) => void;
   onClipMenu: (e: React.MouseEvent, clip: Clip) => void;
+  onKeyframeDown: (e: React.PointerEvent, clip: Clip, kf: Keyframe) => void;
   onSelectTransition: (clipId: string) => void;
   onAddTransition: (clip: Clip, prev: Clip) => void;
   onLaneDown: (e: React.PointerEvent) => void;
@@ -525,7 +552,7 @@ interface TrackRowProps {
   onRemove: () => void;
 }
 
-const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
+const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onKeyframeDown, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
   const isVideo = track.kind === 'video';
   const isText = track.kind === 'text';
   return (
@@ -562,6 +589,7 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
               selected={selection.includes(clip.id)}
               onDown={(e, mode) => onClipDown(e, clip, track, mode)}
               onMenu={(e) => onClipMenu(e, clip)}
+              onKeyframeDown={(e, kf) => onKeyframeDown(e, clip, kf)}
             />
           );
         })}
@@ -612,7 +640,8 @@ const ClipView: React.FC<{
   selected: boolean;
   onDown: (e: React.PointerEvent, mode: ClipMode) => void;
   onMenu: (e: React.MouseEvent) => void;
-}> = React.memo(({ clip, media, trackKind, z, selected, onDown, onMenu }) => {
+  onKeyframeDown: (e: React.PointerEvent, kf: Keyframe) => void;
+}> = React.memo(({ clip, media, trackKind, z, selected, onDown, onMenu, onKeyframeDown }) => {
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
@@ -638,6 +667,15 @@ const ClipView: React.FC<{
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}
+      {clip.keyframes?.map((kf) => (
+        <div
+          key={kf.id}
+          className={`clip-kf${selected ? ' sel' : ''}`}
+          style={{ left: Math.max(6, kf.frame * z) }}
+          onPointerDown={(e) => onKeyframeDown(e, kf)}
+          title="Keyframe: clica para ir até ele, arrasta para o mover"
+        />
+      ))}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
       {w > 40 && !clip.text && (

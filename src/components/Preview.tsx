@@ -5,7 +5,8 @@ import { projectDuration, type CompositionProps } from '../../shared/types';
 import { useEditor } from '../editor-context';
 import { playhead, useFrame, usePlaying } from '../playhead';
 import { clamp, timecode } from '../util';
-import { findClip, updateText } from '../ops';
+import { findClip, setAnimatedProps } from '../ops';
+import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
 
@@ -100,14 +101,15 @@ const TextDragOverlay: React.FC = () => {
   const sel = state.selection.length === 1 ? findClip(state.project, state.selection[0]) : null;
   const clip = sel?.clip;
   if (!clip?.text || frame < clip.start || frame >= clip.start + clip.duration) return null;
-  const text = clip.text;
+  const rel = frame - clip.start;
+  const kv = valuesAt(clip, rel);
 
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
     const box = e.currentTarget.getBoundingClientRect();
     const x0 = e.clientX, y0 = e.clientY;
-    const ox = text.x, oy = text.y;
+    const ox = kv.x, oy = kv.y;
     playhead.pause();
     dispatch({ type: 'beginGesture' });
     const move = (ev: PointerEvent) => {
@@ -118,7 +120,7 @@ const TextDragOverlay: React.FC = () => {
         if (Math.abs(x - g) < 1.2) x = g;
         if (Math.abs(y - g) < 1.2) y = g;
       }
-      dispatch({ type: 'gesture', fn: (p) => updateText(p, clip.id, { x, y }) });
+      dispatch({ type: 'gesture', fn: (p) => setAnimatedProps(p, clip.id, rel, { x, y }) });
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
@@ -131,7 +133,7 @@ const TextDragOverlay: React.FC = () => {
 
   return (
     <div className="text-drag" onPointerDown={onDown} title="Arrasta para mover o texto">
-      <div className="text-drag-mark" style={{ left: `${text.x}%`, top: `${text.y}%` }} />
+      <div className="text-drag-mark" style={{ left: `${kv.x}%`, top: `${kv.y}%` }} />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { Clip, TextContent } from './types';
 import { animState, blockStyle, staggerProgress } from './anim';
 import { FONT_FAMILY } from './fonts';
+import { valuesAt } from './keyframes';
 
 function hexToRgba(hex: string, a: number): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -17,6 +18,7 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
   const k = height / 1080; // tamanho relativo a 1080p
   const fontSize = text.size * k;
   const st = animState(clip.animIn, clip.animOut, frame, clip.duration);
+  const kv = valuesAt(clip, Math.min(clip.duration - 1, Math.max(0, frame)));
   const preset = st.anim?.preset ?? 'none';
   const dist = fontSize * 0.8;
 
@@ -71,9 +73,10 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
       <div
         style={{
           position: 'absolute',
-          left: `${text.x}%`,
-          top: `${text.y}%`,
-          transform: 'translate(-50%, -50%)',
+          left: `${kv.x}%`,
+          top: `${kv.y}%`,
+          transform: `translate(-50%, -50%) rotate(${kv.rotation}deg) scale(${kv.scale})`,
+          opacity: kv.opacity,
           maxWidth: (width * text.maxWidth) / 100,
           width: 'max-content',
         }}

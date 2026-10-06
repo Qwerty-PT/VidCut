@@ -1,8 +1,9 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, ClipColor, ClipTransform, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { Clip, ClipColor, ClipTransform, KfEasing, KfProp, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
 import { clipSpeed } from '../shared/types';
 import { getTransform, isDefaultTransform } from '../shared/transform';
+import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
@@ -202,7 +203,8 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   }
   const fadeIn = Math.min(origin.fadeIn, duration);
   const fadeOut = Math.min(origin.fadeOut, duration);
-  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut });
+  const keyframes = edge === 'left' ? shiftKeyframes(origin.keyframes, origin.start - start) : origin.keyframes;
+  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut, keyframes });
 }
 
 export function updateClip(p: Project, clipId: string, patch: Partial<Clip>): Project {
@@ -253,6 +255,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
           id: uid('c'),
           detachedAudioId: undefined,
           transition: undefined,
+          keyframes: shiftKeyframes(c.keyframes, -leftDur),
           start: frame,
           duration: c.duration - leftDur,
           trimStart: Math.round(c.trimStart + leftDur * clipSpeed(c)),
@@ -362,6 +365,7 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
             ...c,
             duration,
             trimStart: side === 'left' && !isImage ? Math.round(c.trimStart + removed * clipSpeed(c)) : c.trimStart,
+            keyframes: side === 'left' ? shiftKeyframes(c.keyframes, -removed) : c.keyframes,
             fadeIn: Math.min(side === 'left' ? 0 : c.fadeIn, duration),
             fadeOut: Math.min(side === 'right' ? 0 : c.fadeOut, duration),
           };
@@ -461,7 +465,7 @@ export function setSpeed(p: Project, clipId: string, speed: number): Project {
         ...t,
         clips: t.clips.map((c) => {
           if (c.id === clipId) {
-            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration) };
+            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration), keyframes: scaleKeyframes(c.keyframes, old / sp) };
           }
           return c.start >= end0 ? { ...c, start: Math.max(0, c.start + delta) } : c;
         }),
@@ -478,4 +482,79 @@ export function updateColor(p: Project, clipId: string, patch: Partial<ClipColor
   const next = { ...DEFAULT_COLOR, ...f.clip.color, ...patch };
   const isDefault = (Object.keys(DEFAULT_COLOR) as (keyof ClipColor)[]).every((k) => next[k] === 0);
   return updateClip(p, clipId, { color: isDefault ? undefined : next });
+}
+
+/**
+ * Altera propriedades animáveis num frame (relativo ao clip).
+ * Se o clip tiver keyframes, cria/atualiza o keyframe nesse frame (como no CapCut);
+ * senão, altera o valor base.
+ */
+export function setAnimatedProps(p: Project, clipId: string, rel: number, patch: Partial<Record<KfProp, number>>): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  if (c.keyframes?.length) {
+    const frame = Math.min(c.duration - 1, Math.max(0, Math.round(rel)));
+    const existing = c.keyframes.find((k) => k.frame === frame);
+    const keyframes = existing
+      ? c.keyframes.map((k) => (k.id === existing.id ? { ...k, values: { ...k.values, ...patch } } : k))
+      : sortKeyframes([...c.keyframes, { id: uid('k'), frame, values: { ...valuesAt(c, frame), ...patch }, easing: 'productive' as KfEasing }]);
+    return updateClip(p, clipId, { keyframes });
+  }
+  if (c.text) {
+    let q = p;
+    if (patch.x !== undefined || patch.y !== undefined) q = updateText(q, clipId, { ...(patch.x !== undefined ? { x: patch.x } : {}), ...(patch.y !== undefined ? { y: patch.y } : {}) });
+    const rest: Partial<ClipTransform> = {};
+    if (patch.scale !== undefined) rest.scale = patch.scale;
+    if (patch.rotation !== undefined) rest.rotation = patch.rotation;
+    if (patch.opacity !== undefined) rest.opacity = patch.opacity;
+    return Object.keys(rest).length ? updateTransform(q, clipId, rest) : q;
+  }
+  return updateTransform(p, clipId, patch);
+}
+
+/** Cria um keyframe com os valores atuais no frame indicado (relativo ao clip) */
+export function addKeyframe(p: Project, clipId: string, rel: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  const frame = Math.min(c.duration - 1, Math.max(0, Math.round(rel)));
+  if (c.keyframes?.some((k) => k.frame === frame)) return p;
+  const kf = { id: uid('k'), frame, values: valuesAt(c, frame), easing: 'productive' as KfEasing };
+  return updateClip(p, clipId, { keyframes: sortKeyframes([...(c.keyframes ?? []), kf]) });
+}
+
+export function removeKeyframe(p: Project, clipId: string, kfId: string): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.keyframes) return p;
+  const c = f.clip;
+  const kfs = c.keyframes!.filter((k) => k.id !== kfId);
+  if (kfs.length) return updateClip(p, clipId, { keyframes: kfs });
+  // último keyframe: os seus valores passam a ser a base
+  const last = c.keyframes!.find((k) => k.id === kfId)!;
+  const q = updateClip(p, clipId, { keyframes: undefined });
+  return setAnimatedProps(q, clipId, 0, last.values);
+}
+
+export function setKeyframeEasing(p: Project, clipId: string, kfId: string, easing: KfEasing): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.keyframes) return p;
+  return updateClip(p, clipId, { keyframes: f.clip.keyframes.map((k) => (k.id === kfId ? { ...k, easing } : k)) });
+}
+
+/** Move um keyframe para outro frame (relativo ao clip), sem colidir com outro */
+export function moveKeyframe(p: Project, clipId: string, kfId: string, frame: number): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.keyframes) return p;
+  const fr = Math.min(f.clip.duration - 1, Math.max(0, Math.round(frame)));
+  if (f.clip.keyframes.some((k) => k.id !== kfId && k.frame === fr)) return p;
+  return updateClip(p, clipId, { keyframes: sortKeyframes(f.clip.keyframes.map((k) => (k.id === kfId ? { ...k, frame: fr } : k))) });
+}
+
+/** Remove todos os keyframes, ficando com os valores do frame indicado como base */
+export function clearKeyframes(p: Project, clipId: string, rel: number): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.keyframes?.length) return p;
+  const vals = valuesAt(f.clip, rel);
+  return setAnimatedProps(updateClip(p, clipId, { keyframes: undefined }), clipId, 0, vals);
 }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useEditor } from '../editor-context';
 import { useFrame, playhead } from '../playhead';
-import { findClip, updateTransform } from '../ops';
+import { findClip, setAnimatedProps } from '../ops';
+import { animatedTransform } from '../../shared/keyframes';
 import { clamp } from '../util';
 import { baseSize, getTransform } from '../../shared/transform';
 
@@ -22,7 +23,8 @@ export const TransformOverlay: React.FC = () => {
   if (!clip || !sel || sel.track.kind !== 'video' || !media || media.kind === 'audio') return null;
   if (frame < clip.start || frame >= clip.start + clip.duration) return null;
 
-  const t = getTransform(clip);
+  const rel = frame - clip.start;
+  const t = animatedTransform(clip, rel);
   const base = baseSize(media, project.width, project.height, t.fit);
 
   return (
@@ -56,17 +58,17 @@ export const TransformOverlay: React.FC = () => {
                 if (Math.abs(y - g) < 1.2) { y = g; gh = g; }
               }
               setGuides({ v: gv, h: gh });
-              dispatch({ type: 'gesture', fn: (p) => updateTransform(p, clip.id, { x, y }) });
+              dispatch({ type: 'gesture', fn: (p) => setAnimatedProps(p, clip.id, rel, { x, y }) });
             } else if (kind === 'scale') {
               let s = clamp(t.scale * (Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0), 0.05, 10);
               if (Math.abs(s - 1) < 0.02) s = 1;
-              dispatch({ type: 'gesture', fn: (p) => updateTransform(p, clip.id, { scale: s }) });
+              dispatch({ type: 'gesture', fn: (p) => setAnimatedProps(p, clip.id, rel, { scale: s }) });
             } else {
               let r = t.rotation + ((Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180) / Math.PI;
               r = ((r + 540) % 360) - 180;
               for (const g of [-180, -90, 0, 90, 180]) if (Math.abs(r - g) < 4) r = g;
               if (ev.shiftKey) r = Math.round(r / 15) * 15;
-              dispatch({ type: 'gesture', fn: (p) => updateTransform(p, clip.id, { rotation: r === -180 ? 180 : r }) });
+              dispatch({ type: 'gesture', fn: (p) => setAnimatedProps(p, clip.id, rel, { rotation: r === -180 ? 180 : r }) });
             }
           };
           const up = () => {

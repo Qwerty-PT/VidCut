@@ -6,7 +6,8 @@ import { fadeFactor } from './motion';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 import { animState, blockStyle } from './anim';
 import { TextLayer } from './TextLayer';
-import { baseSize, getTransform, mediaStyle } from './transform';
+import { baseSize, mediaStyle } from './transform';
+import { animatedTransform } from './keyframes';
 
 
 const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
@@ -87,7 +88,7 @@ const VisualClip: React.FC<{
   const { width: W, height: H } = useVideoConfig();
   const look = clipLook(clip, act, from + local);
   const src = mediaUrl(base, media.path);
-  const tf = getTransform(clip);
+  const tf = animatedTransform(clip, clampFrame(from + local - clip.start, clip.duration));
   look.opacity *= tf.opacity;
   const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
   const sp = clipSpeed(clip);

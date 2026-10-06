@@ -23,6 +23,7 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - **Velocidade** de vídeos e áudio (0,25× a 4×, slider ou 0,5× / 1× / 1,5× / 2× / 3×): mantém o mesmo excerto, o clip encolhe/estica e os clips seguintes da pista acompanham. Na timeline aparece "2×"
 - **Cor e efeitos** (vídeo e imagem): brilho, contraste, saturação, temperatura (frio ↔ quente), desfocar, vinheta e sépia, com filtros prontos (Vívido, Quente, Frio, P&B, Sépia, Desbotado, Cinema, Vintage)
 - Painel dos clips de vídeo/imagem organizado em separadores: Básico, Enquadrar, Cor, Animação
+- **Keyframes** (vídeo, imagem e texto): animar posição, escala, rotação e opacidade ao longo do tempo. No separador Enquadrar (ou na posição do texto): "Adicionar keyframe" guarda os valores no frame atual; depois, ao mudar a posição/escala/rotação/opacidade noutro frame (no painel ou a arrastar na pré-visualização), o keyframe é criado sozinho. Curva por keyframe: Produtiva, Expressiva (IBM), Linear ou Parar. Setas para saltar entre keyframes; na timeline os keyframes aparecem como losangos (clicar salta, arrastar move). Os keyframes acompanham o conteúdo ao aparar, dividir e mudar a velocidade
 - **Texto**: botão "Texto" na barra da timeline (ou tecla `T`) cria um texto de 3 s na cabeça de leitura, numa pista de texto por cima de tudo. Edita-se no painel da direita: texto (várias linhas), fonte IBM Plex (Sans, Serif, Mono, embutidas), peso, tamanho, cor, alinhamento, posição (grelha de 9 posições, sliders ou **arrastar na pré-visualização** com encaixe no centro e nos terços), largura máxima, caixa de fundo (cor e opacidade) e sombra
 - **Animações de entrada e saída** (texto, imagens e vídeos): Aparecer, Subir, Descer, Da direita, Da esquerda, Escala, Revelar e, só no texto, Máquina de escrever, Palavra a palavra e Linha a linha (com desfasamento entre partes). Curva IBM Produtiva ou Expressiva e duração com presets IBM. Por defeito o texto entra a subir (Expressiva, 400 ms) e sai a desaparecer (Produtiva, 240 ms)
 - Desfazer / refazer (arrastar um clip ou um slider conta como um só passo)
@@ -141,5 +142,5 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
 2. ~~Transições entre clips e pegas de fade arrastáveis~~ (feito)
-3. ~~Texto e animações de entrada/saída~~ (feito). Falta: formas, keyframes (animar posição/escala ao longo do tempo)
+3. ~~Texto, animações de entrada/saída e keyframes~~ (feito). Falta: formas
 4. ~~Efeitos: enquadramento, velocidade, cor, desfocar, vinheta~~ (feito)
