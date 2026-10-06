@@ -35,6 +35,16 @@ export interface Clip {
   audioDetached?: boolean;
   /** Id do clip de áudio criado ao separar (para voltar a juntar) */
   detachedAudioId?: string;
+  /** Transição de entrada: do clip anterior (encostado, na mesma pista de vídeo) para este */
+  transition?: Transition;
+}
+
+export type TransitionType = 'dissolve' | 'dip' | 'slide' | 'push' | 'wipe' | 'zoom';
+
+export interface Transition {
+  type: TransitionType;
+  /** Duração total em frames, centrada no corte */
+  duration: number;
 }
 
 export interface Track {

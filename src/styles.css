@@ -387,3 +387,64 @@ body.dragging-nav, body.dragging-nav * { cursor: ew-resize !important; }
 .clip-badge svg { display: block; }
 
 .btn-row .btn.icon-only { flex: none; width: 34px; padding: 0; }
+
+/* ---------- transições na timeline ---------- */
+.tl-trans {
+  position: absolute; top: 50%; height: 26px; margin-top: -13px; z-index: 3;
+  display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px;
+  border-radius: 6px; cursor: pointer; overflow: hidden; white-space: nowrap;
+  background: rgba(23, 25, 30, 0.82); border: 1px solid rgba(255, 255, 255, 0.35);
+  color: var(--text); font-size: 11px; backdrop-filter: blur(2px);
+}
+.tl-trans:hover { border-color: rgba(255, 255, 255, 0.7); }
+.tl-trans.selected { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+.tl-trans-add {
+  position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; z-index: 3; padding: 0;
+  display: grid; place-items: center; border-radius: 50%; cursor: pointer;
+  background: var(--raised); border: 1px solid var(--line); color: var(--text-dim);
+  opacity: 0; transition: opacity 110ms var(--ease);
+}
+.tl-lane:hover .tl-trans-add { opacity: 0.85; }
+.tl-trans-add:hover, .tl-trans-add:focus-visible { opacity: 1; color: var(--amber); border-color: var(--amber); }
+
+/* pegas de fade no canto superior dos clips */
+.clip-fade-knob {
+  position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; z-index: 2;
+  border-radius: 50%; cursor: ew-resize; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  opacity: 0; transition: opacity 110ms var(--ease);
+}
+.clip:hover .clip-fade-knob, .clip.selected .clip-fade-knob, .clip-fade-knob.on { opacity: 1; }
+.clip-fade-knob.on { background: var(--amber); }
+.clip .clip-name { left: 16px; }
+
+/* painel de transição */
+.trans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.trans-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 4px 7px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; font-size: 11px; color: var(--text-dim);
+}
+.trans-opt:hover { border-color: var(--text-faint); color: var(--text); }
+.trans-opt.on { border-color: var(--amber); color: var(--text); box-shadow: 0 0 0 1px var(--amber); }
+.trans-thumb { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #000; }
+.trans-thumb i { position: absolute; inset: 0; }
+.trans-thumb .a { background: var(--video-hi); }
+.trans-thumb .b { background: var(--audio-hi); animation: 2.4s cubic-bezier(0.4, 0.14, 0.3, 1) infinite; }
+.t-dissolve .b { animation-name: th-fade; }
+.t-dip .a { animation: th-dip-a 2.4s infinite; }
+.t-dip .b { animation-name: th-dip-b; }
+.t-slide .b { animation-name: th-slide; }
+.t-push .a { animation: th-push-a 2.4s cubic-bezier(0.4, 0.14, 0.3, 1) infinite; }
+.t-push .b { animation-name: th-slide; }
+.t-wipe .b { animation-name: th-wipe; }
+.t-zoom .b { animation-name: th-zoom; }
+@keyframes th-fade { 0%, 20% { opacity: 0; } 70%, 100% { opacity: 1; } }
+@keyframes th-dip-a { 0%, 20% { opacity: 1; } 45%, 100% { opacity: 0; } }
+@keyframes th-dip-b { 0%, 45% { opacity: 0; } 70%, 100% { opacity: 1; } }
+@keyframes th-slide { 0%, 20% { transform: translateX(100%); } 70%, 100% { transform: translateX(0); } }
+@keyframes th-push-a { 0%, 20% { transform: translateX(0); } 70%, 100% { transform: translateX(-100%); } }
+@keyframes th-wipe { 0%, 20% { clip-path: inset(0 100% 0 0); } 70%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes th-zoom { 0%, 20% { opacity: 0; transform: scale(1.3); } 70%, 100% { opacity: 1; transform: scale(1); } }
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: -6px; }
+.chip { height: 24px; padding: 0 9px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text-dim); font-size: 11.5px; cursor: pointer; }
+.chip:hover { color: var(--text); border-color: var(--text-faint); }
+.chip.on { color: var(--amber-ink); background: var(--amber); border-color: var(--amber); }

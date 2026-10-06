@@ -26,6 +26,7 @@ const P: Record<string, React.ReactNode> = {
   minus: <path d="M5 12h14" />,
   zoomFit: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></>,
   magnet: <><path d="M6 4v8a6 6 0 0012 0V4" /><path d="M6 8h4M14 8h4" /><path d="M10 4v8a2 2 0 004 0V4" /></>,
+  transition: <><path d="M4 6l7 6-7 6z" /><path d="M20 6l-7 6 7 6z" /></>,
   link: <><path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1" /></>,
   unlink: <><path d="M15.5 13.5l3-3a4 4 0 00-5.66-5.66l-1 1" /><path d="M8.5 10.5l-3 3a4 4 0 005.66 5.66l1-1" /><path d="M4 4l16 16" /></>,
   x: <path d="M6 6l12 12M18 6L6 18" />,

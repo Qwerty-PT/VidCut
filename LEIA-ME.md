@@ -16,7 +16,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Zoom da timeline até ao frame (cerca de 0,3 s visíveis; a régua passa a mostrar frames): arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`
 - Barra de navegação: arrastar o meio para andar na timeline, clicar fora para saltar
 - **Separar áudio** de um clip de vídeo (botão direito no clip, ou no painel da direita): o som passa para uma pista de áudio, alinhado ao frame, e pode ser movido, cortado e ter volume e fades próprios. "Voltar a juntar o áudio" desfaz a separação
-- Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume
+- Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume. Ajusta-se no painel ou a arrastar as bolinhas no canto superior de cada clip (esquerda: fade in, direita: fade out)
+- **Transições** entre clips encostados na mesma pista de vídeo: passa o rato na junção e carrega no **+**. Tipos: Dissolver, Fundido a preto, Deslizar, Empurrar, Cortina, Zoom. Duração com presets IBM (Rápida 240 ms, Média 400 ms, Lenta 700 ms, 1 s) e curva IBM expressiva. A transição fica centrada no corte; se um clip não tiver imagem extra para lá do corte, o primeiro/último frame fica parado durante a transição. Seleciona o bloco da transição para mudar ou apagar (`Delete`)
 - Volume por clip (0–200 %), silenciar e esconder pistas
 - Desfazer / refazer (arrastar um clip ou um slider conta como um só passo)
 - Projeto: resolução (16:9, 4K, 9:16, 1:1, 4:5, 720p), fps (24, 25, 30, 50, 60 — nunca abaixo de 24, regra IBM), cor de fundo
@@ -132,6 +133,6 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 ## Plano
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
-2. **Transições** entre clips (`@remotion/transitions`: fade, slide, wipe…) e pegas de fade arrastáveis no próprio clip
+2. ~~Transições entre clips e pegas de fade arrastáveis~~ (feito)
 3. **Texto e animações**: pista de texto/formas, presets IBM (productive/expressive) já definidos em `shared/motion.ts`, keyframes, stagger automático
 4. **Efeitos**: velocidade, cor/brilho, blur, crop/zoom, presets guardáveis

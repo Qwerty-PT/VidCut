@@ -35,8 +35,10 @@ export function initialState(): EditorState {
 const push = (past: Project[], p: Project) => (past.length >= HISTORY_LIMIT ? [...past.slice(1), p] : [...past, p]);
 
 function validSelection(p: Project, ids: string[]): string[] {
-  const all = new Set(p.tracks.flatMap((t) => t.clips.map((c) => c.id)));
-  return ids.filter((id) => all.has(id));
+  const clips = p.tracks.flatMap((t) => t.clips);
+  const all = new Set(clips.map((c) => c.id));
+  const withTrans = new Set(clips.filter((c) => c.transition).map((c) => 'tr:' + c.id));
+  return ids.filter((id) => all.has(id) || withTrans.has(id));
 }
 
 export function reducer(s: EditorState, a: Action): EditorState {

@@ -207,9 +207,20 @@ export function updateClip(p: Project, clipId: string, patch: Partial<Clip>): Pr
   };
 }
 
+export const TRANSITION_PREFIX = 'tr:';
+export const transitionSelId = (clipId: string) => TRANSITION_PREFIX + clipId;
+
+/** Apaga clips; ids "tr:<clipId>" apagam só a transição de entrada desse clip */
 export function deleteClips(p: Project, ids: string[]): Project {
   const set = new Set(ids);
-  return { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !set.has(c.id)) })) };
+  const trans = new Set(ids.filter((id) => id.startsWith(TRANSITION_PREFIX)).map((id) => id.slice(TRANSITION_PREFIX.length)));
+  return {
+    ...p,
+    tracks: p.tracks.map((t) => ({
+      ...t,
+      clips: t.clips.filter((c) => !set.has(c.id)).map((c) => (trans.has(c.id) ? { ...c, transition: undefined } : c)),
+    })),
+  };
 }
 
 /** Clips sob o frame indicado */
@@ -234,6 +245,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
           ...c,
           id: uid('c'),
           detachedAudioId: undefined,
+          transition: undefined,
           start: frame,
           duration: c.duration - leftDur,
           trimStart: c.trimStart + leftDur,
@@ -267,6 +279,7 @@ export function changeFps(p: Project, fps: number): Project {
         trimStart: r(c.trimStart),
         fadeIn: r(c.fadeIn),
         fadeOut: r(c.fadeOut),
+        transition: c.transition ? { ...c.transition, duration: Math.max(2, r(c.transition.duration)) } : undefined,
       })),
     })),
   };
@@ -350,4 +363,9 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
       return { ...t, clips };
     }),
   };
+}
+
+/** Define (ou remove, com undefined) a transição de entrada de um clip */
+export function setTransition(p: Project, clipId: string, transition: Clip['transition']): Project {
+  return updateClip(p, clipId, { transition });
 }

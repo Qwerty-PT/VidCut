@@ -1,10 +1,12 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
+import { TRANSITION_PREFIX, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
-import type { Project } from '../../shared/types';
+import type { Project, TransitionType } from '../../shared/types';
+import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
+import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 
 const RESOLUTIONS: { label: string; w: number; h: number }[] = [
   { label: '1920 × 1080 (16:9)', w: 1920, h: 1080 },
@@ -71,6 +73,10 @@ export const Inspector: React.FC = () => {
   const { state, commit, dispatch } = useEditor();
   const { project, selection } = state;
   const found = selection.length === 1 ? findClip(project, selection[0]) : null;
+
+  if (selection.length === 1 && selection[0].startsWith(TRANSITION_PREFIX)) {
+    return <TransitionPanel clipId={selection[0].slice(TRANSITION_PREFIX.length)} />;
+  }
 
   if (selection.length > 1) {
     return (
@@ -208,3 +214,74 @@ export const Inspector: React.FC = () => {
     </aside>
   );
 };
+
+/** Painel de uma transição selecionada na timeline */
+const TransitionPanel: React.FC<{ clipId: string }> = ({ clipId }) => {
+  const { state, commit } = useEditor();
+  const { project } = state;
+  const f = findClip(project, clipId);
+  const prev = f ? prevAdjacent(f.track, f.clip) : undefined;
+  if (!f || !f.clip.transition || !prev) return null;
+  const tr = f.clip.transition;
+  const fps = project.fps;
+  const max = maxTransition(prev, f.clip);
+  const dur = Math.min(tr.duration, max);
+  const set = (patch: Partial<typeof tr>) => commit((p) => setTransition(p, clipId, { ...tr, ...patch }));
+  const sec = (dur / fps).toFixed(2).replace('.', ',');
+  // durações IBM úteis para transições (as mais curtas são demasiado rápidas para vídeo)
+  const presets: { label: string; ms: number }[] = [
+    { label: 'Rápida', ms: DURATIONS_MS['moderate-02'] },
+    { label: 'Média', ms: DURATIONS_MS['slow-01'] },
+    { label: 'Lenta', ms: DURATIONS_MS['slow-02'] },
+    { label: '1 s', ms: 1000 },
+  ];
+  return (
+    <aside className="panel inspector">
+      <header className="panel-head"><h2>Transição</h2></header>
+      <div className="inspector-body">
+        <div className="trans-grid" role="radiogroup" aria-label="Tipo de transição">
+          {TRANSITIONS.map((t) => (
+            <button
+              key={t.type}
+              role="radio"
+              aria-checked={tr.type === t.type}
+              className={`trans-opt${tr.type === t.type ? ' on' : ''}`}
+              title={t.hint}
+              onClick={() => set({ type: t.type as TransitionType })}
+            >
+              <TransitionThumb type={t.type} />
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <Row label="Duração" hint={`${sec} s`}>
+          <Range min={2} max={max} step={1} value={dur} apply={(v) => (p) => setTransition(p, clipId, { ...tr, duration: v })} />
+        </Row>
+        <div className="chip-row">
+          {presets.map((pr) => {
+            const fr = Math.min(max, msToFrames(pr.ms, fps));
+            return (
+              <button key={pr.label} className={`chip${fr === dur ? ' on' : ''}`} onClick={() => set({ duration: Math.max(2, fr) })} title={`${pr.ms} ms`}>
+                {pr.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="hint">A transição fica centrada no corte. Se um clip não tiver imagem extra para lá do corte, o primeiro ou último frame fica parado durante a transição. Usa a curva IBM expressiva.</p>
+
+        <button className="btn danger block" onClick={() => commit((p) => setTransition(p, clipId, undefined), [])}>
+          <Icon name="trash" size={16} /> Remover transição
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+/** Miniatura animada (CSS) de cada tipo de transição */
+const TransitionThumb: React.FC<{ type: string }> = ({ type }) => (
+  <span className={`trans-thumb t-${type}`} aria-hidden>
+    <i className="a" />
+    <i className="b" />
+  </span>
+);

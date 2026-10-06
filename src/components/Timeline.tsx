@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { addClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, trimClip, updateTrack } from '../ops';
+import { addClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
 import { clamp, isTyping, timecode } from '../util';
@@ -16,8 +17,10 @@ const SNAP_PX = 8;
 const MIN_PPS = 2; // px por segundo
 const MAX_PPS = 4000; // ~0,25 s visíveis num ecrã normal
 
+type ClipMode = 'move' | 'left' | 'right' | 'fadeIn' | 'fadeOut';
+
 type Gesture = {
-  mode: 'move' | 'left' | 'right';
+  mode: ClipMode;
   origin: Clip;
   originTrackId: string;
   kind: Track['kind'];
@@ -193,7 +196,7 @@ export const Timeline: React.FC = () => {
       const g = gesture.current;
       if (!g) return;
       if (!g.started) {
-        if (Math.abs(ev.clientX - g.x0) < 3 && g.mode !== 'move') return;
+        if (Math.abs(ev.clientX - g.x0) < 2 && g.mode !== 'move') return;
         if (Math.abs(ev.clientX - g.x0) < 3 && trackAtClientY(ev.clientY, g.kind) === g.originTrackId) return;
         g.started = true;
         playhead.pause();
@@ -211,6 +214,12 @@ export const Timeline: React.FC = () => {
         const toTrack = trackAtClientY(ev.clientY, g.kind) ?? findClip(projectRef.current, g.origin.id)?.track.id ?? g.originTrackId;
         setSnapLine(line);
         dispatch({ type: 'gesture', fn: (p) => moveClip(p, g.origin.id, toTrack, start) });
+      } else if (g.mode === 'fadeIn' || g.mode === 'fadeOut') {
+        const max = Math.floor(g.origin.duration / 2);
+        const key = g.mode;
+        const v = clamp(Math.round(key === 'fadeIn' ? g.origin.fadeIn + dx : g.origin.fadeOut - dx), 0, max);
+        setSnapLine(null);
+        dispatch({ type: 'gesture', fn: (p) => updateClip(p, g.origin.id, { [key]: v }) });
       } else {
         const edge0 = g.mode === 'left' ? g.origin.start : g.origin.start + g.origin.duration;
         const s = snapValue(Math.round(edge0 + dx), g.snapPoints);
@@ -396,6 +405,8 @@ export const Timeline: React.FC = () => {
               dropActive={dropTarget === track.id}
               onClipDown={onClipDown}
               onClipMenu={onClipMenu}
+              onSelectTransition={(id) => { playhead.pause(); dispatch({ type: 'select', ids: [transitionSelId(id)] }); }}
+              onAddTransition={(clip, prev) => commit((p) => setTransition(p, clip.id, { type: 'dissolve', duration: clamp(Math.round(fps * 0.5), 2, maxTransition(prev, clip)) }), [transitionSelId(clip.id)])}
               onLaneDown={onLaneDown}
               dragProps={dragProps(track.id, track.id)}
               onToggle={(patch) => commit((p) => updateTrack(p, track.id, patch))}
@@ -500,15 +511,17 @@ interface TrackRowProps {
   z: number;
   selection: string[];
   dropActive: boolean;
-  onClipDown: (e: React.PointerEvent, clip: Clip, track: Track, mode: 'move' | 'left' | 'right') => void;
+  onClipDown: (e: React.PointerEvent, clip: Clip, track: Track, mode: ClipMode) => void;
   onClipMenu: (e: React.MouseEvent, clip: Clip) => void;
+  onSelectTransition: (clipId: string) => void;
+  onAddTransition: (clip: Clip, prev: Clip) => void;
   onLaneDown: (e: React.PointerEvent) => void;
   dragProps: Record<string, unknown>;
   onToggle: (patch: Partial<Track>) => void;
   onRemove: () => void;
 }
 
-const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onLaneDown, dragProps, onToggle, onRemove, project }) => {
+const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
   const isVideo = track.kind === 'video';
   return (
     <div className={`tl-row kind-${track.kind}`} style={{ height: TRACK_H[track.kind] }} data-track-id={track.id} data-track-kind={track.kind}>
@@ -545,6 +558,40 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
             />
           );
         })}
+        {isVideo && track.clips.map((clip) => {
+          const prev = prevAdjacent(track, clip);
+          if (!prev) return null;
+          const selId = transitionSelId(clip.id);
+          if (clip.transition) {
+            const d = Math.min(clip.transition.duration, maxTransition(prev, clip));
+            const { pre } = splitDuration(d);
+            const w = Math.max(16, d * z);
+            return (
+              <div
+                key={selId}
+                className={`tl-trans${selection.includes(selId) ? ' selected' : ''}`}
+                style={{ left: clip.start * z - Math.max(pre * z, w / 2), width: w }}
+                onPointerDown={(e) => { e.stopPropagation(); if (e.button === 0) onSelectTransition(clip.id); }}
+                title={`Transição: ${transitionLabel(clip.transition.type)}`}
+              >
+                <Icon name="transition" size={13} />
+                {w > 70 && <span>{transitionLabel(clip.transition.type)}</span>}
+              </div>
+            );
+          }
+          return (
+            <button
+              key={selId}
+              className="tl-trans-add"
+              style={{ left: clip.start * z }}
+              onPointerDown={(e) => { e.stopPropagation(); if (e.button === 0) onAddTransition(clip, prev); }}
+              title="Adicionar transição"
+              aria-label="Adicionar transição"
+            >
+              <Icon name="plus" size={11} />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -556,7 +603,7 @@ const ClipView: React.FC<{
   trackKind: Track['kind'];
   z: number;
   selected: boolean;
-  onDown: (e: React.PointerEvent, mode: 'move' | 'left' | 'right') => void;
+  onDown: (e: React.PointerEvent, mode: ClipMode) => void;
   onMenu: (e: React.MouseEvent) => void;
 }> = React.memo(({ clip, media, trackKind, z, selected, onDown, onMenu }) => {
   const w = Math.max(2, clip.duration * z);
@@ -585,6 +632,22 @@ const ClipView: React.FC<{
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
+      {w > 40 && (
+        <>
+          <div
+            className={`clip-fade-knob in${clip.fadeIn ? ' on' : ''}`}
+            style={{ left: Math.max(9, fi) }}
+            onPointerDown={(e) => onDown(e, 'fadeIn')}
+            title="Arrasta para a direita: fade in"
+          />
+          <div
+            className={`clip-fade-knob out${clip.fadeOut ? ' on' : ''}`}
+            style={{ left: Math.min(w - 9, w - fo) }}
+            onPointerDown={(e) => onDown(e, 'fadeOut')}
+            title="Arrasta para a esquerda: fade out"
+          />
+        </>
+      )}
     </div>
   );
 });

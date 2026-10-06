@@ -1,29 +1,89 @@
 import React from 'react';
-import { AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame } from 'remotion';
 import type { Clip, CompositionProps, MediaItem, Track } from './types';
-import { mediaUrl } from './types';
+import { mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
+import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 
 const fill: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'contain' };
 
-const VisualClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: string }> = ({ clip, media, track, base }) => {
-  const frame = useCurrentFrame(); // relativo ao início da Sequence
-  const opacity = fadeFactor(frame, clip.duration, clip.fadeIn, clip.fadeOut);
+const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
+
+/** Opacidade, transformações e volume de um clip de vídeo num frame global */
+function clipLook(clip: Clip, act: ActiveTransitions, g: number) {
+  let opacity = fadeFactor(clampFrame(g - clip.start, clip.duration), clip.duration, clip.fadeIn, clip.fadeOut);
+  let volume = opacity;
+  const transforms: string[] = [];
+  let clipPath: string | undefined;
+  const apply = (role: 'in' | 'out', type: NonNullable<ActiveTransitions['inT']>['type'], t: number) => {
+    const r = transitionStyle(type, role, t);
+    opacity *= r.opacity;
+    volume *= transitionVolume(role, t);
+    if (r.style.transform) transforms.push(String(r.style.transform));
+    if (r.style.clipPath) clipPath = String(r.style.clipPath);
+  };
+  if (act.inT) {
+    const w0 = clip.start - act.inT.pre;
+    const len = act.inT.pre + act.inT.post;
+    if (g < w0 + len) apply('in', act.inT.type, (g - w0) / len);
+  }
+  if (act.outT) {
+    const end = clip.start + clip.duration;
+    const w0 = end - act.outT.pre;
+    const len = act.outT.pre + act.outT.post;
+    if (g >= w0) apply('out', act.outT.type, (g - w0) / len);
+  }
+  return { opacity, volume, style: { transform: transforms.join(' ') || undefined, clipPath } as React.CSSProperties };
+}
+
+const VisualClip: React.FC<{
+  clip: Clip; media: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
+}> = ({ clip, media, track, base, fps, act, from, pre, post }) => {
+  const local = useCurrentFrame();
+  const look = clipLook(clip, act, from + local);
   const src = mediaUrl(base, media.path);
   const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
 
-  return (
-    <AbsoluteFill style={{ opacity }}>
-      {media.kind === 'image' ? (
+  if (media.kind === 'image') {
+    return (
+      <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
         <Img src={src} style={fill} />
-      ) : (
+      </AbsoluteFill>
+    );
+  }
+
+  // Frames extra da fonte antes/depois do clip (para a transição); se não houver, congela
+  const srcLen = sourceFrames(media, fps);
+  const preReal = clip.trimStart >= pre;
+  const postReal = clip.trimStart + clip.duration + post <= srcLen;
+  const mainFrom = preReal ? 0 : pre;
+  const mainDur = clip.duration + (preReal ? pre : 0) + (postReal ? post : 0);
+  const mainTrim = clip.trimStart - (preReal ? pre : 0);
+
+  return (
+    <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+      {pre > 0 && !preReal && (
+        <Sequence from={0} durationInFrames={pre} layout="none">
+          <Freeze frame={0}>
+            <OffthreadVideo src={src} trimBefore={clip.trimStart > 0 ? clip.trimStart : undefined} muted style={fill} />
+          </Freeze>
+        </Sequence>
+      )}
+      <Sequence from={mainFrom} durationInFrames={mainDur} layout="none">
         <OffthreadVideo
           src={src}
-          trimBefore={clip.trimStart > 0 ? clip.trimStart : undefined}
+          trimBefore={mainTrim > 0 ? mainTrim : undefined}
           muted={vol === 0}
-          volume={(f) => vol * fadeFactor(f, clip.duration, clip.fadeIn, clip.fadeOut)}
+          volume={(f) => vol * clipLook(clip, act, from + mainFrom + f).volume}
           style={fill}
         />
+      </Sequence>
+      {post > 0 && !postReal && (
+        <Sequence from={pre + clip.duration} durationInFrames={post} layout="none">
+          <Freeze frame={0}>
+            <OffthreadVideo src={src} trimBefore={Math.max(0, clip.trimStart + clip.duration - 1)} muted style={fill} />
+          </Freeze>
+        </Sequence>
       )}
     </AbsoluteFill>
   );
@@ -48,17 +108,24 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
   return (
     <AbsoluteFill style={{ backgroundColor: project.background }}>
       {ordered.map((track) =>
-        track.clips.map((clip) => {
+        [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
           if (!media || clip.duration <= 0) return null;
-          if (track.kind === 'video' && track.hidden) return null;
-          return (
-            <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
-              {track.kind === 'video' ? (
-                <VisualClip clip={clip} media={media} track={track} base={mediaBase} />
-              ) : (
+          if (track.kind === 'audio') {
+            return (
+              <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
                 <AudioClip clip={clip} media={media} track={track} base={mediaBase} />
-              )}
+              </Sequence>
+            );
+          }
+          if (track.hidden) return null;
+          const act = activeTransitions(track, clip);
+          const pre = act.inT?.pre ?? 0;
+          const post = act.outT?.post ?? 0;
+          const from = clip.start - pre;
+          return (
+            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media.name}>
+              <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} />
             </Sequence>
           );
         }),
