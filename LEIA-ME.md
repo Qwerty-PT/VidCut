@@ -10,6 +10,7 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Timeline multi-pista (vídeo e áudio), pistas de vídeo de cima ficam por cima da imagem
 - Mover clips (também entre pistas do mesmo tipo), aparar pelas pontas, dividir, apagar
 - Três tipos de divisão, como no CapCut: dividir (`S`), dividir e eliminar à esquerda (`Q`) e dividir e eliminar à direita (`W`). Nos dois últimos, o espaço que fica é fechado (os clips seguintes da mesma pista encostam)
+- Cabeça de leitura arrastável: pela pega no topo (na régua) ou agarrando a própria linha em qualquer ponto (o cursor muda ao passar por cima)
 - Íman: encaixa nas pontas de outros clips e na cabeça de leitura
 - Magnet ao largar media: o clip cola-se ao fim do clip anterior nessa pista (ou ao início, se a pista estiver vazia). Com o íman desligado, fica onde o largaste
 - Zoom da timeline até ao frame (cerca de 0,3 s visíveis; a régua passa a mostrar frames): arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`

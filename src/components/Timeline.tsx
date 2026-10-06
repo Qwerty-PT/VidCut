@@ -154,11 +154,15 @@ export const Timeline: React.FC = () => {
 
   // ---------- régua / scrub ----------
   const onRulerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
     playhead.pause();
+    document.body.classList.add('scrubbing');
     const seekTo = (x: number) => playhead.seek(clamp(Math.round(frameAtClientX(x)), 0, duration - 1));
     seekTo(e.clientX);
     const move = (ev: PointerEvent) => seekTo(ev.clientX);
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('scrubbing'); };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
@@ -375,7 +379,10 @@ export const Timeline: React.FC = () => {
         <div className="tl-content" style={{ width: contentW }}>
           <div className="tl-ruler-row" style={{ height: RULER_H }}>
             <div className="tl-corner" style={{ width: HEADER_W }} />
-            <div className="tl-ruler" onPointerDown={onRulerDown}>{ticks}</div>
+            <div className="tl-ruler" onPointerDown={onRulerDown}>
+              {ticks}
+              <PlayheadHandle z={z} onDown={onRulerDown} />
+            </div>
           </div>
 
           {project.tracks.map((track) => (
@@ -407,7 +414,7 @@ export const Timeline: React.FC = () => {
           </div>
 
           {snapLine !== null && <div className="tl-snapline" style={{ left: HEADER_W + snapLine * z, top: RULER_H, height: tracksHeight }} />}
-          <Playhead z={z} height={RULER_H + tracksHeight} />
+          <Playhead z={z} top={RULER_H} height={tracksHeight} onDown={onRulerDown} />
         </div>
       </div>
 
@@ -458,9 +465,32 @@ export const Timeline: React.FC = () => {
   );
 };
 
-const Playhead: React.FC<{ z: number; height: number }> = ({ z, height }) => {
+/** Linha da cabeça de leitura: pode ser agarrada e arrastada (área de toque mais larga que a linha) */
+const Playhead: React.FC<{ z: number; top: number; height: number; onDown: (e: React.PointerEvent) => void }> = ({ z, top, height, onDown }) => {
   const frame = useFrame();
-  return <div className="tl-playhead" style={{ transform: `translateX(${HEADER_W + frame * z}px)`, height }} />;
+  return (
+    <div
+      className="tl-playhead"
+      style={{ transform: `translateX(${HEADER_W + frame * z}px)`, top, height }}
+      onPointerDown={onDown}
+      title="Arrasta para mover a cabeça de leitura"
+    >
+      <div className="tl-playhead-line" />
+    </div>
+  );
+};
+
+/** Pega no topo da cabeça de leitura (na régua), como no CapCut */
+const PlayheadHandle: React.FC<{ z: number; onDown: (e: React.PointerEvent) => void }> = ({ z, onDown }) => {
+  const frame = useFrame();
+  return (
+    <div className="tl-playhead-handle" style={{ transform: `translateX(${frame * z}px)` }} onPointerDown={onDown}>
+      <svg width="16" height="22" viewBox="0 0 16 22" aria-hidden>
+        <path d="M3 1h10a2 2 0 012 2v10.2a2 2 0 01-.6 1.4L8 21 1.6 14.6A2 2 0 011 13.2V3a2 2 0 012-2z" />
+      </svg>
+      <div className="tl-playhead-handle-line" />
+    </div>
+  );
 };
 
 interface TrackRowProps {
