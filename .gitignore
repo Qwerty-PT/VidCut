@@ -1,0 +1,8 @@
+node_modules/
+dist/
+remotion-bundle/
+release/
+test-media/
+.remotion/
+*.log
+.DS_Store

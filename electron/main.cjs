@@ -1,0 +1,196 @@
+// Processo principal do VidCut (Electron).
+const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
+const path = require('node:path');
+const fs = require('node:fs/promises');
+const { createMediaServer } = require('./media-server.cjs');
+const { renderProject } = require('./render.cjs');
+
+const isDev = process.env.VIDCUT_DEV === '1';
+const appRoot = path.join(__dirname, '..');
+
+// Na app empacotada, o Chrome headless do Remotion é descarregado para a pasta de dados
+// do utilizador (a pasta da app é só de leitura). Em dev fica em node_modules/.remotion.
+if (app.isPackaged) {
+  const dataDir = app.getPath('userData');
+  require('node:fs').mkdirSync(dataDir, { recursive: true });
+  process.chdir(dataDir);
+}
+
+const MEDIA_FILTERS = [
+  { name: 'Media', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'png', 'jpg', 'jpeg', 'webp', 'gif'] },
+  { name: 'Vídeo', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv'] },
+  { name: 'Áudio', extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'] },
+  { name: 'Imagem', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
+];
+const PROJECT_FILTERS = [{ name: 'Projeto VidCut', extensions: ['vidcut', 'json'] }];
+
+const mediaServer = createMediaServer();
+let mediaBase = '';
+let win = null;
+let currentExport = null;
+
+const autosavePath = () => path.join(app.getPath('userData'), 'autosave.vidcut');
+
+function registerProjectMedia(project) {
+  mediaServer.register((project?.media || []).map((m) => m.path));
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 640,
+    backgroundColor: '#121316',
+    title: 'VidCut',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  if (isDev) {
+    win.loadURL('http://localhost:5173');
+    win.webContents.openDevTools({ mode: 'detach' });
+  } else {
+    win.loadFile(path.join(appRoot, 'dist', 'index.html'));
+  }
+  // Links externos abrem no browser do sistema
+  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+}
+
+function buildMenu() {
+  const send = (cmd) => () => win?.webContents.send('menu', cmd);
+  const isMac = process.platform === 'darwin';
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'Ficheiro',
+      submenu: [
+        { label: 'Novo projeto', accelerator: 'CmdOrCtrl+N', click: send('new') },
+        { label: 'Abrir projeto…', accelerator: 'CmdOrCtrl+O', click: send('open') },
+        { label: 'Guardar', accelerator: 'CmdOrCtrl+S', click: send('save') },
+        { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', click: send('saveAs') },
+        { type: 'separator' },
+        { label: 'Importar media…', accelerator: 'CmdOrCtrl+I', click: send('import') },
+        { label: 'Exportar vídeo…', accelerator: 'CmdOrCtrl+E', click: send('export') },
+        { type: 'separator' },
+        isMac ? { role: 'close', label: 'Fechar' } : { role: 'quit', label: 'Sair' },
+      ],
+    },
+    {
+      label: 'Editar',
+      submenu: [
+        { label: 'Desfazer', accelerator: 'CmdOrCtrl+Z', click: send('undo') },
+        { label: 'Refazer', accelerator: 'CmdOrCtrl+Shift+Z', click: send('redo') },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar' }, { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Colar' },
+      ],
+    },
+    {
+      label: 'Ver',
+      submenu: [
+        { role: 'reload', label: 'Recarregar' },
+        { role: 'toggleDevTools', label: 'Ferramentas de programador' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Ecrã inteiro' },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// ---------- IPC ----------
+ipcMain.handle('app:info', () => ({ mediaBase, platform: process.platform, version: app.getVersion() }));
+
+ipcMain.handle('media:pick', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Importar media', properties: ['openFile', 'multiSelections'], filters: MEDIA_FILTERS });
+  if (r.canceled) return [];
+  mediaServer.register(r.filePaths);
+  return r.filePaths;
+});
+
+ipcMain.handle('media:register', (_e, paths) => { mediaServer.register(paths || []); return true; });
+
+ipcMain.handle('project:open', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Abrir projeto', properties: ['openFile'], filters: PROJECT_FILTERS });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const file = r.filePaths[0];
+  const project = JSON.parse(await fs.readFile(file, 'utf8'));
+  registerProjectMedia(project);
+  return { path: file, project };
+});
+
+ipcMain.handle('project:save', async (_e, { project, filePath, saveAs }) => {
+  let target = filePath;
+  if (!target || saveAs) {
+    const r = await dialog.showSaveDialog(win, {
+      title: 'Guardar projeto',
+      defaultPath: `${(project.name || 'projeto').replace(/[\\/:*?"<>|]/g, '_')}.vidcut`,
+      filters: PROJECT_FILTERS,
+    });
+    if (r.canceled || !r.filePath) return null;
+    target = r.filePath;
+  }
+  await fs.writeFile(target, JSON.stringify(project, null, 2), 'utf8');
+  return target;
+});
+
+ipcMain.handle('autosave:write', async (_e, data) => {
+  await fs.writeFile(autosavePath(), JSON.stringify(data), 'utf8');
+  return true;
+});
+
+ipcMain.handle('autosave:read', async () => {
+  try {
+    const data = JSON.parse(await fs.readFile(autosavePath(), 'utf8'));
+    registerProjectMedia(data.project);
+    return data;
+  } catch { return null; }
+});
+
+ipcMain.handle('export:start', async (_e, project) => {
+  if (currentExport) return { ok: false, error: 'Já há um export em curso.' };
+  const r = await dialog.showSaveDialog(win, {
+    title: 'Exportar vídeo',
+    defaultPath: `${(project.name || 'video').replace(/[\\/:*?"<>|]/g, '_')}.mp4`,
+    filters: [{ name: 'Vídeo MP4', extensions: ['mp4'] }],
+  });
+  if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+
+  registerProjectMedia(project);
+  const job = renderProject({
+    appRoot, project, mediaBase, outPath: r.filePath,
+    onProgress: (p) => win?.webContents.send('export:progress', p),
+  });
+  currentExport = job;
+  try {
+    const out = await job.promise;
+    return { ok: true, path: out };
+  } catch (err) {
+    const msg = String(err?.message || err);
+    if (/cancel/i.test(msg)) return { ok: false, canceled: true };
+    return { ok: false, error: msg };
+  } finally {
+    currentExport = null;
+  }
+});
+
+ipcMain.handle('export:cancel', () => { currentExport?.cancel(); return true; });
+
+ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
+
+// ---------- Arranque ----------
+app.setName('VidCut');
+app.whenReady().then(async () => {
+  mediaBase = await mediaServer.listen();
+  buildMenu();
+  createWindow();
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+
+app.on('window-all-closed', () => {
+  mediaServer.close();
+  if (process.platform !== 'darwin') app.quit();
+});

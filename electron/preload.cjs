@@ -1,0 +1,27 @@
+// Ponte segura entre a interface (renderer) e o processo principal.
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+contextBridge.exposeInMainWorld('vidcut', {
+  info: () => ipcRenderer.invoke('app:info'),
+  pickMedia: () => ipcRenderer.invoke('media:pick'),
+  registerMedia: (paths) => ipcRenderer.invoke('media:register', paths),
+  /** Caminho absoluto de um ficheiro largado na janela (drag & drop do sistema) */
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  openProject: () => ipcRenderer.invoke('project:open'),
+  saveProject: (project, filePath, saveAs) => ipcRenderer.invoke('project:save', { project, filePath, saveAs }),
+  autosaveWrite: (data) => ipcRenderer.invoke('autosave:write', data),
+  autosaveRead: () => ipcRenderer.invoke('autosave:read'),
+  exportVideo: (project) => ipcRenderer.invoke('export:start', project),
+  cancelExport: () => ipcRenderer.invoke('export:cancel'),
+  showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
+  onExportProgress: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on('export:progress', h);
+    return () => ipcRenderer.removeListener('export:progress', h);
+  },
+  onMenu: (cb) => {
+    const h = (_e, cmd) => cb(cmd);
+    ipcRenderer.on('menu', h);
+    return () => ipcRenderer.removeListener('menu', h);
+  },
+});
