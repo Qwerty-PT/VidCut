@@ -53,7 +53,7 @@ export const Timeline: React.FC = () => {
   const [snapLine, setSnapLine] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [, forceThumbs] = useState(0);
-  const [view, setView] = useState({ left: 0, width: 0 }); // scrollLeft e largura visível da área dos clips
+  const [view, setView] = useState({ left: 0, width: 0, height: 0 }); // scrollLeft e largura visível da área dos clips
   const [menu, setMenu] = useState<{ x: number; y: number; clipId: string } | null>(null);
   const pendingScroll = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,13 +102,13 @@ export const Timeline: React.FC = () => {
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && pendingScroll.current !== null) { el.scrollLeft = pendingScroll.current; pendingScroll.current = null; }
-    if (el) setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W });
+    if (el) setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W, height: el.clientHeight });
   }, [pps]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const update = () => setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W });
+    const update = () => setView({ left: el.scrollLeft, width: el.clientWidth - HEADER_W, height: el.clientHeight });
     update();
     el.addEventListener('scroll', update, { passive: true });
     const ro = new ResizeObserver(update);
@@ -414,7 +414,7 @@ export const Timeline: React.FC = () => {
           </div>
 
           {snapLine !== null && <div className="tl-snapline" style={{ left: HEADER_W + snapLine * z, top: RULER_H, height: tracksHeight }} />}
-          <Playhead z={z} top={RULER_H} height={tracksHeight} onDown={onRulerDown} />
+          <Playhead z={z} top={RULER_H} height={Math.max(tracksHeight + 44, view.height - RULER_H)} onDown={onRulerDown} />
         </div>
       </div>
 
