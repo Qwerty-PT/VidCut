@@ -489,3 +489,42 @@ body.dragging-nav, body.dragging-nav * { cursor: ew-resize !important; }
 }
 .text-drag-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: var(--amber); }
 .preview-frame { position: relative; }
+
+/* ---------- enquadramento ---------- */
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+.btn.active { color: var(--amber); border-color: var(--amber); }
+.btn.tiny:disabled { opacity: 0.35; }
+.layout-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.layout-opt { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 10px; color: var(--text-dim); line-height: 1.1; text-align: center; }
+.layout-opt:hover { color: var(--text); border-color: var(--text-faint); }
+.layout-ico { position: relative; width: 32px; height: 18px; border: 1px solid var(--text-faint); border-radius: 2px; overflow: hidden; }
+.layout-ico i { position: absolute; background: var(--amber); }
+.l-full .layout-ico i { inset: 2px 6px; }
+.l-fill .layout-ico i { inset: 0; }
+.l-left .layout-ico i { left: 0; top: 0; bottom: 0; width: 50%; }
+.l-right .layout-ico i { right: 0; top: 0; bottom: 0; width: 50%; }
+.l-top .layout-ico i { left: 0; right: 0; top: 0; height: 50%; }
+.l-bottom .layout-ico i { left: 0; right: 0; bottom: 0; height: 50%; }
+.l-pip-tl .layout-ico i { left: 2px; top: 2px; width: 10px; height: 6px; }
+.l-pip-tr .layout-ico i { right: 2px; top: 2px; width: 10px; height: 6px; }
+.l-pip-bl .layout-ico i { left: 2px; bottom: 2px; width: 10px; height: 6px; }
+.l-pip-br .layout-ico i { right: 2px; bottom: 2px; width: 10px; height: 6px; }
+.crop-box { border: 1px solid var(--line-soft); border-radius: 8px; padding: 6px 10px; }
+.crop-box summary { cursor: pointer; font-size: 12px; color: var(--text-dim); padding: 2px 0; }
+.crop-box[open] { display: flex; flex-direction: column; gap: 10px; padding-bottom: 10px; }
+
+/* caixa de transformação na pré-visualização */
+.tf-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.tf-rot { position: absolute; width: 0; height: 0; }
+.tf-box { position: absolute; outline: 1.5px solid var(--amber); outline-offset: 0; cursor: move; pointer-events: auto; touch-action: none; }
+.tf-handle { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; background: #fff; border: 1.5px solid var(--amber); border-radius: 2px; pointer-events: auto; }
+.tf-handle.nw { left: 0; top: 0; cursor: nwse-resize; }
+.tf-handle.se { left: 100%; top: 100%; cursor: nwse-resize; }
+.tf-handle.ne { left: 100%; top: 0; cursor: nesw-resize; }
+.tf-handle.sw { left: 0; top: 100%; cursor: nesw-resize; }
+.tf-rotate { position: absolute; left: 50%; top: -28px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; border: 1.5px solid var(--amber); cursor: grab; pointer-events: auto; }
+.tf-rotate::after { content: ''; position: absolute; left: 50%; top: 13px; width: 1.5px; height: 14px; margin-left: -0.75px; background: var(--amber); }
+.tf-guide { position: absolute; background: rgba(242, 179, 61, 0.8); pointer-events: none; }
+.tf-guide.v { top: 0; bottom: 0; width: 1px; }
+.tf-guide.h { left: 0; right: 0; height: 1px; }
+body.tf-dragging, body.tf-dragging * { user-select: none; }

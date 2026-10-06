@@ -7,6 +7,7 @@ import { playhead, useFrame, usePlaying } from '../playhead';
 import { clamp, timecode } from '../util';
 import { findClip, updateText } from '../ops';
 import { Icon } from './Icon';
+import { TransformOverlay } from './TransformOverlay';
 
 export const Preview: React.FC = () => {
   const { state, mediaBase } = useEditor();
@@ -64,6 +65,7 @@ export const Preview: React.FC = () => {
             acknowledgeRemotionLicense
           />
           <TextDragOverlay />
+          <TransformOverlay />
         </div>
       </div>
       <Transport duration={duration} fps={project.fps} />

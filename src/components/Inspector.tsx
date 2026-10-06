@@ -5,7 +5,7 @@ import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row } from './Fields';
-import { AnimSection, TextFields } from './ClipPanels';
+import { AnimSection, TextFields, TransformSection } from './ClipPanels';
 import type { Project, TransitionType } from '../../shared/types';
 import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
@@ -183,6 +183,8 @@ export const Inspector: React.FC = () => {
             )}
           </div>
         )}
+
+        {isVisual && media && media.kind !== 'audio' && <TransformSection clip={clip} media={media} />}
 
         {media?.kind !== 'image' && !clip.audioDetached && (
           <Row label="Volume" hint={`${Math.round(clip.volume * 100)}%`}>

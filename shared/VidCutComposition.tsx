@@ -1,13 +1,13 @@
 import React from 'react';
-import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { Clip, CompositionProps, MediaItem, Track } from './types';
 import { mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 import { animState, blockStyle } from './anim';
 import { TextLayer } from './TextLayer';
+import { baseSize, getTransform, mediaStyle } from './transform';
 
-const fill: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'contain' };
 
 const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
 
@@ -50,8 +50,12 @@ const VisualClip: React.FC<{
   clip: Clip; media: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
 }> = ({ clip, media, track, base, fps, act, from, pre, post }) => {
   const local = useCurrentFrame();
+  const { width: W, height: H } = useVideoConfig();
   const look = clipLook(clip, act, from + local);
   const src = mediaUrl(base, media.path);
+  const tf = getTransform(clip);
+  const fill = mediaStyle(tf, baseSize(media, W, H, tf.fit));
+  look.opacity *= tf.opacity;
   const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
 
   if (media.kind === 'image') {

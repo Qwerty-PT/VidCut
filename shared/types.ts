@@ -42,6 +42,26 @@ export interface Clip {
   animOut?: ClipAnim;
   /** Clips de texto (mediaId vazio) */
   text?: TextContent;
+  /** Posição, escala, rotação, recorte… (clips de vídeo e imagem) */
+  transform?: ClipTransform;
+}
+
+export interface ClipTransform {
+  /** Centro do clip em % do quadro */
+  x: number;
+  y: number;
+  /** 1 = tamanho base (ajustado ao quadro) */
+  scale: number;
+  /** Graus */
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
+  /** Recorte em % do próprio clip (0–100) */
+  crop: { top: number; right: number; bottom: number; left: number };
+  /** 0–1 */
+  opacity: number;
+  /** Tamanho base: caber inteiro (contain) ou preencher o quadro (cover) */
+  fit: 'contain' | 'cover';
 }
 
 export type AnimPreset =

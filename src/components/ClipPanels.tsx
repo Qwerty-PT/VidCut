@@ -1,9 +1,10 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { updateClip, updateText } from '../ops';
+import { updateClip, updateText, updateTransform } from '../ops';
 import { Range, Row, Segmented } from './Fields';
 import { Icon } from './Icon';
-import type { AnimPreset, Clip, ClipAnim, TextContent } from '../../shared/types';
+import type { AnimPreset, Clip, ClipAnim, MediaItem, TextContent } from '../../shared/types';
+import { LAYOUT_PRESETS, applyLayoutPreset, getTransform, isDefaultTransform } from '../../shared/transform';
 import { ANIM_PRESETS } from '../../shared/anim';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 import { FONT_LABEL } from '../../shared/fonts';
@@ -172,3 +173,68 @@ export const AnimSection: React.FC<{ clip: Clip; isText: boolean; fps: number }>
     <p className="hint">Regras IBM: um eixo de cada vez, sem ressaltos; o texto aparece no sentido da leitura.</p>
   </section>
 );
+
+/** Posição, escala, rotação, espelho, recorte e opacidade de um clip de vídeo/imagem */
+export const TransformSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ clip, media }) => {
+  const { state, commit } = useEditor();
+  const { width: W, height: H } = state.project;
+  const t = getTransform(clip);
+  const set = (patch: Parameters<typeof updateTransform>[2]) => commit((p) => updateTransform(p, clip.id, patch));
+  const cropRange = (side: 'top' | 'right' | 'bottom' | 'left', label: string) => (
+    <Row label={label} hint={`${Math.round(t.crop[side])}%`}>
+      <Range min={0} max={90} step={0.5} value={t.crop[side]} apply={(v) => (p) => updateTransform(p, clip.id, { crop: { ...t.crop, [side]: v } })} />
+    </Row>
+  );
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h3 className="section-title">Enquadramento</h3>
+        <button className="btn tiny" disabled={isDefaultTransform(t)} onClick={() => commit((p) => updateClip(p, clip.id, { transform: undefined }))}>Repor</button>
+      </div>
+
+      <div className="layout-grid" role="group" aria-label="Disposições rápidas">
+        {LAYOUT_PRESETS.map((l) => (
+          <button key={l.preset} className={`layout-opt l-${l.preset}`} title={l.label} onClick={() => commit((p) => updateClip(p, clip.id, { transform: applyLayoutPreset(l.preset, media, W, H, t) }))}>
+            <span className="layout-ico" aria-hidden><i /></span>
+            <span>{l.label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="hint">Para ecrã dividido: põe cada vídeo numa pista e escolhe "Metade esq." num e "Metade dir." no outro. Também podes arrastar, redimensionar e rodar na pré-visualização.</p>
+
+      <Row label="Escala" hint={`${Math.round(t.scale * 100)}%`}>
+        <Range min={0.05} max={4} step={0.01} value={t.scale} apply={(v) => (p) => updateTransform(p, clip.id, { scale: v })} />
+      </Row>
+      <div className="field">
+        <span className="field-label">Posição <em>{Math.round(t.x)}% · {Math.round(t.y)}%</em></span>
+        <div className="pos-sliders">
+          <Range min={-50} max={150} step={0.5} value={t.x} apply={(v) => (p) => updateTransform(p, clip.id, { x: v })} />
+          <Range min={-50} max={150} step={0.5} value={t.y} apply={(v) => (p) => updateTransform(p, clip.id, { y: v })} />
+        </div>
+      </div>
+      <Row label="Rotação" hint={`${Math.round(t.rotation)}°`}>
+        <Range min={-180} max={180} step={1} value={t.rotation} apply={(v) => (p) => updateTransform(p, clip.id, { rotation: v })} />
+      </Row>
+      <div className="btn-row">
+        <button className="btn" title="Rodar 90° para a esquerda" onClick={() => set({ rotation: ((t.rotation - 90 + 540) % 360) - 180 })}><Icon name="rotateL" size={16} /></button>
+        <button className="btn" title="Rodar 90° para a direita" onClick={() => set({ rotation: ((t.rotation + 90 + 540) % 360) - 180 })}><Icon name="rotateR" size={16} /></button>
+        <button className={`btn${t.flipH ? ' active' : ''}`} title="Espelhar na horizontal" onClick={() => set({ flipH: !t.flipH })}><Icon name="flipH" size={16} /></button>
+        <button className={`btn${t.flipV ? ' active' : ''}`} title="Espelhar na vertical" onClick={() => set({ flipV: !t.flipV })}><Icon name="flipV" size={16} /></button>
+      </div>
+      <Row label="Ajuste ao quadro">
+        <Segmented label="Ajuste" value={t.fit} onChange={(v) => set({ fit: v })}
+          options={[{ value: 'contain', label: 'Caber inteiro', title: 'Mostra a imagem toda (pode ficar com barras)' }, { value: 'cover', label: 'Preencher', title: 'Enche o quadro (corta o que sobra)' }]} />
+      </Row>
+      <Row label="Opacidade" hint={`${Math.round(t.opacity * 100)}%`}>
+        <Range min={0} max={1} step={0.01} value={t.opacity} apply={(v) => (p) => updateTransform(p, clip.id, { opacity: v })} />
+      </Row>
+      <details className="crop-box">
+        <summary>Recorte</summary>
+        {cropRange('top', 'Cima')}
+        {cropRange('bottom', 'Baixo')}
+        {cropRange('left', 'Esquerda')}
+        {cropRange('right', 'Direita')}
+      </details>
+    </section>
+  );
+};

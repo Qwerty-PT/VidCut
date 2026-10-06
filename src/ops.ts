@@ -1,6 +1,7 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { Clip, ClipTransform, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import { getTransform, isDefaultTransform } from '../shared/transform';
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
@@ -422,4 +423,13 @@ export function updateText(p: Project, clipId: string, patch: Partial<TextConten
   const f = findClip(p, clipId);
   if (!f?.clip.text) return p;
   return updateClip(p, clipId, { text: { ...f.clip.text, ...patch } });
+}
+
+/** Atualiza a transformação de um clip (parcial; o recorte é fundido) */
+export function updateTransform(p: Project, clipId: string, patch: Partial<ClipTransform>): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const cur = getTransform(f.clip);
+  const next: ClipTransform = { ...cur, ...patch, crop: { ...cur.crop, ...patch.crop } };
+  return updateClip(p, clipId, { transform: isDefaultTransform(next) ? undefined : next });
 }
