@@ -80,6 +80,18 @@ npm run dist:mac
 - Abrir o .dmg → arrastar o VidCut para Aplicações
 - Assinatura ad-hoc (sem certificado Apple): num .dmg feito no próprio Mac abre logo. Se for copiado para outro Mac, a primeira vez abre-se com botão direito → Abrir (ou `xattr -cr /Applications/VidCut.app`)
 
+### Windows (.exe)
+
+```
+npm run dist:win
+```
+
+- Resultado: `release/VidCut-<versão>-Setup.exe` (instalador em português, escolhe a pasta, cria atalhos no ambiente de trabalho e no menu Iniciar)
+- Pode ser gerado num PC Windows ou a partir de Linux com Wine (`wine` + `wine32`); o script instala o compositor do Remotion para Windows
+- O ícone e a versão do .exe são aplicados por `scripts/after-pack.cjs` (resedit, sem Wine)
+- Sem certificado de assinatura: na primeira vez o Windows mostra "O Windows protegeu o computador" → **Mais informações** → **Executar mesmo assim**
+- Dados da app (autosave, Chrome do Remotion, formas de onda): `%APPDATA%\VidCut`
+
 Notas:
 - Na app instalada, o Chrome do Remotion fica em `~/Library/Application Support/VidCut/node_modules/.remotion` (descarregado no primeiro export); o autosave e as formas de onda ficam na mesma pasta
 - Empacotamento testado em Linux (pasta desempacotada): importar, exportar GIF e MP3 a partir da app instalada
@@ -170,7 +182,7 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 5. ~~Modelos Remotion (aba Modelos, painel automático, pasta modelos/)~~ (feito)
 6. ~~Edição rápida: seleção múltipla, copiar/colar/duplicar, ripple, forma de onda~~ (feito)
 7. ~~Opções de export: formatos, resolução, qualidade, fps, intervalo~~ (feito)
-8. ~~Instalador .dmg com ícone e assinatura ad-hoc~~ (feito)
+8. ~~Instaladores: .dmg (macOS) e .exe (Windows) com ícone~~ (feito)
 
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
