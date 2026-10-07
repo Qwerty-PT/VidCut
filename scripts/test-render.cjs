@@ -1,6 +1,6 @@
 // Teste de export sem Electron: gera um projeto com cortes, fades, sobreposição e música
 // usando os ficheiros de test-media/ e renderiza para test-media/saida.mp4.
-// Uso: node scripts/test-render.cjs
+// Uso: node scripts/test-render.cjs ['{"codec":"h264",...}'] [saida.ext]
 const path = require('node:path');
 const { createMediaServer } = require('../electron/media-server.cjs');
 const { renderProject } = require('../electron/render.cjs');
@@ -34,11 +34,12 @@ const project = {
   const server = createMediaServer();
   server.register(project.media.map((x) => x.path));
   const mediaBase = await server.listen();
-  const out = m('saida.mp4');
+  const spec = process.argv[2] ? JSON.parse(process.argv[2]) : undefined;
+  const out = process.argv[3] ? path.resolve(process.argv[3]) : m('saida.mp4');
   let last = -1;
   const t = Date.now();
   const job = renderProject({
-    appRoot: root, project, mediaBase, outPath: out,
+    appRoot: root, project, mediaBase, outPath: out, spec,
     onProgress: (p) => {
       const pct = Math.floor(p.progress * 100);
       if (p.stage !== 'render' || pct >= last + 20) { console.log(`[${p.stage}] ${pct}% ${p.message ?? ''}`); last = pct; }

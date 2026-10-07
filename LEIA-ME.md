@@ -35,7 +35,14 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Desfazer / refazer (arrastar um clip ou um slider conta como um só passo)
 - Projeto: resolução (16:9, 4K, 9:16, 1:1, 4:5, 720p), fps (24, 25, 30, 50, 60 — nunca abaixo de 24, regra IBM), cor de fundo
 - Guardar e abrir projetos `.vidcut` (JSON), gravação automática contínua
-- Exportar MP4 (H.264 + AAC) com barra de progresso e cancelar
+- Exportar (`Ctrl+E`) com diálogo de opções, barra de progresso e cancelar:
+  - Formato: MP4 (H.264), HEVC (H.265, ~40% mais leve, abre no QuickTime), WebM (VP9), ProRes 422 HQ (.mov, para outro editor), GIF, MP3, WAV
+  - Resolução: projeto, 4K, 2K, 1080p, 720p, 480p (lado menor; serve para vertical e horizontal)
+  - Qualidade Alta/Média/Leve (CRF e bitrate de áudio; no GIF escolhe os fps)
+  - Fotogramas: os do projeto ou 24/25/30/50/60
+  - O que exportar: tudo, os clips selecionados, ou um intervalo de/até
+  - Incluir áudio sim/não; resumo com dimensões, duração e tamanho estimado
+  - As últimas opções ficam lembradas
 
 ## Requisitos
 
@@ -86,7 +93,7 @@ Notas:
 | `Ctrl+Z` / `Ctrl+Shift+Z` (ou `Ctrl+Y`) | Desfazer / refazer |
 | `Ctrl+S` / `Ctrl+Shift+S` | Guardar / guardar como |
 | `Ctrl+O` / `Ctrl+N` | Abrir / novo projeto |
-| `Ctrl+I` / `Ctrl+E` | Importar media / exportar vídeo |
+| `Ctrl+I` / `Ctrl+E` | Importar media / exportar (vídeo, GIF ou áudio) |
 | `Shift` ou `Ctrl` + clique | Seleção múltipla |
 | Duplo clique na media | Adiciona na cabeça de leitura |
 | Botão direito num clip | Dividir (3 tipos), separar/juntar áudio, apagar |
@@ -111,7 +118,7 @@ src/                 interface React
   ops.ts             operações de edição puras (adicionar, mover, aparar, dividir…)
   playhead.ts        cabeça de leitura (fora do React para não re-renderizar tudo)
   media.ts           leitura de duração/dimensões e miniaturas
-  components/        MediaBin, Preview, Inspector, Timeline, ExportModal, Icon
+  components/        MediaBin, Preview, Inspector, Timeline, ExportOptions, ExportModal, Icon
 scripts/
   bundle-remotion.mjs   gera remotion-bundle/ (pré-compilado, usado no export)
   make-test-media.sh    cria ficheiros de teste em test-media/ (precisa de ffmpeg)
@@ -134,7 +141,8 @@ O projeto é um único JSON. Todos os tempos estão em **frames** à taxa do pro
 - Export real (Node): corte inicial exato ao frame, fades de imagem e áudio, imagem sobreposta, volume a 50 %
 - App Electron real (Linux, ecrã virtual): importar 4 ficheiros, adicionar à timeline, exportar MP4 1080p, separar áudio pelo menu de contexto, zoom pela barra de navegação
 
-Para repetir o teste de export: `sh scripts/make-test-media.sh && node scripts/test-render.cjs`
+Para repetir o teste de export: `sh scripts/make-test-media.sh && node scripts/test-render.cjs` (opcional: `'{"codec":"gif","scale":0.5,"everyNthFrame":2}' saida.gif`)
+- Export dos 7 formatos verificado com ffprobe (codec, dimensões, fps, duração, etiqueta hvc1 no HEVC)
 
 ## Limitações conhecidas
 
@@ -150,6 +158,7 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 
 5. ~~Modelos Remotion (aba Modelos, painel automático, pasta modelos/)~~ (feito)
 6. ~~Edição rápida: seleção múltipla, copiar/colar/duplicar, ripple, forma de onda~~ (feito)
+7. ~~Opções de export: formatos, resolução, qualidade, fps, intervalo~~ (feito). Falta: instalador .dmg
 
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)

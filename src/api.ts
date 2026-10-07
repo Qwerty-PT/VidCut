@@ -1,5 +1,6 @@
 // Tipos da ponte exposta pelo preload (window.vidcut).
 import type { Project } from '../shared/types';
+import type { RenderSpec } from '../shared/export';
 
 export interface ExportProgress {
   stage: 'browser' | 'prepare' | 'render' | 'muxing' | 'done';
@@ -18,7 +19,7 @@ export interface VidCutApi {
   saveProject(project: Project, filePath: string | null, saveAs: boolean): Promise<string | null>;
   autosaveWrite(data: AutosaveData): Promise<boolean>;
   autosaveRead(): Promise<AutosaveData | null>;
-  exportVideo(project: Project): Promise<{ ok: boolean; path?: string; error?: string; canceled?: boolean }>;
+  exportVideo(project: Project, spec: RenderSpec): Promise<{ ok: boolean; path?: string; error?: string; canceled?: boolean }>;
   cancelExport(): Promise<boolean>;
   showItem(p: string): Promise<boolean>;
   peaks(file: string): Promise<Uint8Array>;

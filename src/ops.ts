@@ -294,6 +294,9 @@ export function changeFps(p: Project, fps: number): Project {
         fadeIn: r(c.fadeIn),
         fadeOut: r(c.fadeOut),
         transition: c.transition ? { ...c.transition, duration: Math.max(2, r(c.transition.duration)) } : undefined,
+        ...(c.animIn ? { animIn: { ...c.animIn, duration: Math.max(1, r(c.animIn.duration)) } } : {}),
+        ...(c.animOut ? { animOut: { ...c.animOut, duration: Math.max(1, r(c.animOut.duration)) } } : {}),
+        ...(c.keyframes ? { keyframes: c.keyframes.map((kf) => ({ ...kf, frame: r(kf.frame) })) } : {}),
       })),
     })),
   };

@@ -3,7 +3,7 @@ import { api, type ExportProgress } from '../api';
 import { Icon } from './Icon';
 
 export type ExportState =
-  | { phase: 'running'; progress: ExportProgress | null }
+  | { phase: 'running'; progress: ExportProgress | null; audioOnly?: boolean }
   | { phase: 'done'; path: string }
   | { phase: 'error'; error: string };
 
@@ -22,7 +22,7 @@ export const ExportModal: React.FC<{ state: ExportState; onClose: () => void }> 
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
         <h3 id="export-title">
-          {state.phase === 'running' ? 'A exportar vídeo' : state.phase === 'done' ? 'Vídeo exportado' : 'Erro no export'}
+          {state.phase === 'running' ? (state.audioOnly ? 'A exportar áudio' : 'A exportar') : state.phase === 'done' ? 'Exportação concluída' : 'Erro no export'}
         </h3>
 
         {state.phase === 'running' && (

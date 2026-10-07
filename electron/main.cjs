@@ -156,18 +156,20 @@ ipcMain.handle('autosave:read', async () => {
   } catch { return null; }
 });
 
-ipcMain.handle('export:start', async (_e, project) => {
+ipcMain.handle('export:start', async (_e, { project, spec }) => {
   if (currentExport) return { ok: false, error: 'Já há um export em curso.' };
+  const ext = /^[a-z0-9]{2,4}$/.test(spec?.ext || '') ? spec.ext : 'mp4';
+  const audioOnly = ext === 'mp3' || ext === 'wav';
   const r = await dialog.showSaveDialog(win, {
-    title: 'Exportar vídeo',
-    defaultPath: `${(project.name || 'video').replace(/[\\/:*?"<>|]/g, '_')}.mp4`,
-    filters: [{ name: 'Vídeo MP4', extensions: ['mp4'] }],
+    title: audioOnly ? 'Exportar áudio' : 'Exportar vídeo',
+    defaultPath: `${(project.name || 'video').replace(/[\\/:*?"<>|]/g, '_')}.${ext}`,
+    filters: [{ name: String(spec?.filter || ext.toUpperCase()), extensions: [ext] }],
   });
   if (r.canceled || !r.filePath) return { ok: false, canceled: true };
 
   registerProjectMedia(project);
   const job = renderProject({
-    appRoot, project, mediaBase, outPath: r.filePath,
+    appRoot, project, mediaBase, outPath: r.filePath, spec,
     onProgress: (p) => win?.webContents.send('export:progress', p),
   });
   currentExport = job;

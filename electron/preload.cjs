@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('vidcut', {
   saveProject: (project, filePath, saveAs) => ipcRenderer.invoke('project:save', { project, filePath, saveAs }),
   autosaveWrite: (data) => ipcRenderer.invoke('autosave:write', data),
   autosaveRead: () => ipcRenderer.invoke('autosave:read'),
-  exportVideo: (project) => ipcRenderer.invoke('export:start', project),
+  exportVideo: (project, spec) => ipcRenderer.invoke('export:start', { project, spec }),
   cancelExport: () => ipcRenderer.invoke('export:cancel'),
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   peaks: (file) => ipcRenderer.invoke('media:peaks', file),

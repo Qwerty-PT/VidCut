@@ -12,6 +12,9 @@ import { Preview } from './components/Preview';
 import { Inspector, cutAtPlayhead, splitAtPlayhead } from './components/Inspector';
 import { Timeline } from './components/Timeline';
 import { ExportModal, type ExportState } from './components/ExportModal';
+import { ExportOptionsModal, loadExportOptions } from './components/ExportOptions';
+import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '../shared/export';
+import { changeFps } from './ops';
 import { Icon } from './components/Icon';
 
 type Toast = { id: number; msg: string; kind: 'info' | 'error' };
@@ -22,6 +25,7 @@ export const App: React.FC = () => {
   stateRef.current = state;
   const [mediaBase, setMediaBase] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ExportState | null>(null);
+  const [exportSetup, setExportSetup] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const clipboard = useRef<ClipboardData | null>(null);
@@ -133,14 +137,38 @@ export const App: React.FC = () => {
     if (path) { dispatch({ type: 'saved', filePath: path }); notify('Projeto guardado'); }
   };
 
-  const doExport = async () => {
+  const doExport = () => {
     const p = stateRef.current.project;
     if (p.tracks.every((t) => t.clips.length === 0)) return notify('A timeline está vazia.', 'error');
     playhead.pause();
+    setExportSetup(true);
+  };
+
+  /** Intervalo [início, fim) dos clips selecionados, em frames do projeto */
+  const selectionRange = (): [number, number] | null => {
+    const s = stateRef.current;
+    const ids = new Set(s.selection);
+    let a = Infinity, b = -Infinity;
+    for (const t of s.project.tracks) for (const c of t.clips) {
+      if (!ids.has(c.id)) continue;
+      a = Math.min(a, c.start); b = Math.max(b, c.start + c.duration);
+    }
+    return a < b ? [a, b] : null;
+  };
+
+  const runExport = async (o: ExportOptions) => {
+    setExportSetup(false);
+    const p0 = stateRef.current.project;
+    const r0 = rangeFrames(p0, o, selectionRange());
+    const fps = exportFps(p0, o);
+    const p = changeFps(p0, fps);
+    const k = fps / p0.fps;
+    const range: [number, number] | null = r0 ? [Math.round(r0[0] * k), Math.max(Math.round(r0[0] * k), Math.round((r0[1] + 1) * k) - 1)] : null;
+    const spec = buildSpec(p, o, range);
     const off = api().onExportProgress((progress) => setExporting((e) => (e?.phase === 'running' ? { phase: 'running', progress } : e)));
-    setExporting({ phase: 'running', progress: null });
+    setExporting({ phase: 'running', progress: null, audioOnly: !!FORMATS[o.format].audioOnly });
     try {
-      const r = await api().exportVideo(p);
+      const r = await api().exportVideo(p, spec);
       if (r.ok && r.path) setExporting({ phase: 'done', path: r.path });
       else if (r.canceled) setExporting(null);
       else setExporting({ phase: 'error', error: r.error || 'Erro desconhecido' });
@@ -199,7 +227,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e) || exporting) return;
+      if (isTyping(e) || exporting || exportSetup) return;
       const s = stateRef.current;
       const dur = projectDuration(s.project);
       const mod = e.ctrlKey || e.metaKey;
@@ -238,7 +266,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commit, exporting]);
+  }, [commit, exporting, exportSetup]);
 
   const ctx = useMemo<EditorCtx | null>(
     () => (mediaBase === null ? null : { state, dispatch, commit, mediaBase, importPaths, notify }),
@@ -266,7 +294,7 @@ export const App: React.FC = () => {
           <div className="top-actions">
             <button className="btn ghost" onClick={doOpen} title="Abrir projeto (Ctrl+O)"><Icon name="open" size={16} /> Abrir</button>
             <button className="btn ghost" onClick={() => doSave(false)} title="Guardar (Ctrl+S)"><Icon name="save" size={16} /> Guardar</button>
-            <button className="btn primary" onClick={doExport} title="Exportar MP4 (Ctrl+E)"><Icon name="export" size={16} /> Exportar</button>
+            <button className="btn primary" onClick={doExport} title="Exportar vídeo, GIF ou áudio (Ctrl+E)"><Icon name="export" size={16} /> Exportar</button>
           </div>
         </header>
 
@@ -282,6 +310,15 @@ export const App: React.FC = () => {
         <div className="toasts">
           {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.msg}</div>)}
         </div>
+        {exportSetup && (
+          <ExportOptionsModal
+            project={state.project}
+            selectionRange={selectionRange()}
+            initial={loadExportOptions()}
+            onCancel={() => setExportSetup(false)}
+            onExport={runExport}
+          />
+        )}
         {exporting && <ExportModal state={exporting} onClose={() => setExporting(null)} />}
       </div>
     </EditorProvider>
