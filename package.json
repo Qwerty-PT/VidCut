@@ -15,7 +15,7 @@
     "dist": "npm run build && electron-builder",
     "dist:win": "npm install --no-save --force @remotion/compositor-win32-x64-msvc@4.0.533 && npm run build && electron-builder --win --x64 --publish never",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never"
   },
   "dependencies": {
     "@remotion/renderer": "4.0.533",
@@ -96,11 +96,34 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "category": "AudioVideo",
-      "icon": "build/icon.png"
+      "icon": "build/icons",
+      "maintainer": "Nuno Silva",
+      "synopsis": "Editor de vídeo simples com animações",
+      "executableArgs": [
+        "--no-sandbox"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "desktop": {
+        "entry": {
+          "Name": "VidCut",
+          "Comment": "Editor de vídeo simples com animações",
+          "StartupWMClass": "VidCut"
+        }
+      }
     },
     "copyright": "© 2026 Nuno Silva",
     "dmg": {
@@ -141,6 +164,21 @@
     "publish": null,
     "portable": {
       "artifactName": "${productName}-${version}-Portatil.${ext}"
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2 | libasound2t64"
+      ]
     }
-  }
+  },
+  "homepage": "https://github.com/Qwerty-PT"
 }
