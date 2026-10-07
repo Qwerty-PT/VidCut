@@ -1,7 +1,7 @@
 {
   "name": "vidcut",
   "productName": "VidCut",
-  "version": "0.1.0",
+  "version": "0.14.0",
   "description": "Editor de vídeo simples com animações (Remotion + Electron)",
   "author": "Nuno Silva",
   "private": true,
@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
     "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
@@ -44,7 +44,8 @@
     "appId": "app.vidcut.desktop",
     "productName": "VidCut",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "electron/**",
@@ -57,18 +58,53 @@
       "remotion-bundle/**"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.png"
     },
     "mac": {
-      "target": "dmg",
-      "category": "public.app-category.video"
+      "target": [
+        {
+          "target": "dmg"
+        }
+      ],
+      "category": "public.app-category.video",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "O VidCut não grava áudio.",
+        "LSApplicationCategoryType": "public.app-category.video"
+      }
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "build/icon.png"
+    },
+    "copyright": "© 2026 Nuno Silva",
+    "dmg": {
+      "title": "VidCut ${version}",
+      "contents": [
+        {
+          "x": 150,
+          "y": 200
+        },
+        {
+          "x": 450,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 600,
+        "height": 400
+      }
     }
   }
 }

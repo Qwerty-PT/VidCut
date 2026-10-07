@@ -12,8 +12,13 @@ const appRoot = path.join(__dirname, '..');
 // Na app empacotada, o Chrome headless do Remotion é descarregado para a pasta de dados
 // do utilizador (a pasta da app é só de leitura). Em dev fica em node_modules/.remotion.
 if (app.isPackaged) {
+  const fsSync = require('node:fs');
   const dataDir = app.getPath('userData');
-  require('node:fs').mkdirSync(dataDir, { recursive: true });
+  fsSync.mkdirSync(dataDir, { recursive: true });
+  // O Remotion guarda o Chrome em <pasta com package.json>/node_modules/.remotion:
+  // um package.json aqui garante que fica dentro da pasta de dados da app.
+  const pkg = path.join(dataDir, 'package.json');
+  if (!fsSync.existsSync(pkg)) fsSync.writeFileSync(pkg, '{ "name": "vidcut-data", "private": true }\n');
   process.chdir(dataDir);
 }
 
