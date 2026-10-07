@@ -4,6 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { createMediaServer } = require('./media-server.cjs');
 const { renderProject } = require('./render.cjs');
+const { getPeaks } = require('./peaks.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -85,7 +86,12 @@ function buildMenu() {
         { label: 'Desfazer', accelerator: 'CmdOrCtrl+Z', click: send('undo') },
         { label: 'Refazer', accelerator: 'CmdOrCtrl+Shift+Z', click: send('redo') },
         { type: 'separator' },
-        { role: 'cut', label: 'Cortar' }, { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Colar' },
+        // tratados pela app: clips na timeline, ou texto se estiver a escrever num campo
+        { label: 'Cortar', accelerator: 'CmdOrCtrl+X', click: send('cut') },
+        { label: 'Copiar', accelerator: 'CmdOrCtrl+C', click: send('copy') },
+        { label: 'Colar', accelerator: 'CmdOrCtrl+V', click: send('paste') },
+        { label: 'Duplicar', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
+        { label: 'Selecionar tudo', accelerator: 'CmdOrCtrl+A', click: send('selectAll') },
       ],
     },
     {
@@ -178,6 +184,19 @@ ipcMain.handle('export:start', async (_e, project) => {
 });
 
 ipcMain.handle('export:cancel', () => { currentExport?.cancel(); return true; });
+
+ipcMain.handle('media:peaks', async (_e, file) => {
+  try { return new Uint8Array(await getPeaks(file, path.join(app.getPath('userData'), 'peaks'))); }
+  catch { return new Uint8Array(0); }
+});
+
+// edição nativa de texto (quando o foco está num campo)
+ipcMain.handle('edit:native', (_e, action) => {
+  const wc = win?.webContents;
+  if (!wc) return false;
+  if (['cut', 'copy', 'paste', 'selectAll', 'undo', 'redo'].includes(action)) wc[action]();
+  return true;
+});
 
 ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
 

@@ -21,6 +21,8 @@ export interface VidCutApi {
   exportVideo(project: Project): Promise<{ ok: boolean; path?: string; error?: string; canceled?: boolean }>;
   cancelExport(): Promise<boolean>;
   showItem(p: string): Promise<boolean>;
+  peaks(file: string): Promise<Uint8Array>;
+  nativeEdit(action: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'): Promise<boolean>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
   onMenu(cb: (cmd: string) => void): () => void;
 }

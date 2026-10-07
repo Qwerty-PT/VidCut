@@ -603,3 +603,128 @@ export function updateTemplateProps(p: Project, clipId: string, patch: Record<st
   if (!f?.clip.template) return p;
   return updateClip(p, clipId, { template: { ...f.clip.template, props: { ...f.clip.template.props, ...patch } } });
 }
+
+// ---------------------------------------------------------------------------
+// Edição rápida: mover vários, apagar fechando espaço, copiar/colar/duplicar
+// ---------------------------------------------------------------------------
+
+const clipIdsOnly = (ids: string[]) => ids.filter((id) => !id.startsWith(TRANSITION_PREFIX));
+
+/** Intervalo de deslocamento permitido para mover um grupo de clips sem saltar por cima de outros */
+export function groupMoveRange(p: Project, ids: string[]): { min: number; max: number } {
+  const set = new Set(clipIdsOnly(ids));
+  let min = -Infinity, max = Infinity;
+  for (const t of p.tracks) {
+    const moving = t.clips.filter((c) => set.has(c.id));
+    if (!moving.length) continue;
+    const fixed = t.clips.filter((c) => !set.has(c.id));
+    for (const c of moving) {
+      min = Math.max(min, -c.start);
+      for (const f of fixed) {
+        if (f.start + f.duration <= c.start) min = Math.max(min, f.start + f.duration - c.start);
+        if (f.start >= c.start + c.duration) max = Math.min(max, f.start - (c.start + c.duration));
+      }
+    }
+  }
+  return { min: min === -Infinity ? 0 : min, max };
+}
+
+/** Move vários clips o mesmo número de frames (cada um na sua pista) */
+export function moveClips(p: Project, ids: string[], delta: number): Project {
+  const { min, max } = groupMoveRange(p, ids);
+  const d = Math.round(Math.min(max, Math.max(min, delta)));
+  if (!d) return p;
+  const set = new Set(clipIdsOnly(ids));
+  return {
+    ...p,
+    tracks: p.tracks.map((t) => (t.clips.some((c) => set.has(c.id))
+      ? { ...t, clips: sortClips(t.clips.map((c) => (set.has(c.id) ? { ...c, start: c.start + d } : c))) }
+      : t)),
+  };
+}
+
+/** Apaga clips e puxa os seguintes da mesma pista para fechar o espaço (ripple) */
+export function rippleDelete(p: Project, ids: string[]): Project {
+  const set = new Set(clipIdsOnly(ids));
+  if (!set.size) return deleteClips(p, ids);
+  const base = deleteClips(p, ids.filter((id) => id.startsWith(TRANSITION_PREFIX)));
+  return {
+    ...base,
+    tracks: base.tracks.map((t) => {
+      const removed = t.clips.filter((c) => set.has(c.id));
+      if (!removed.length) return t;
+      const kept = t.clips.filter((c) => !set.has(c.id)).map((c) => {
+        const shift = removed.filter((r) => r.start + r.duration <= c.start).reduce((s, r) => s + r.duration, 0);
+        return shift ? { ...c, start: c.start - shift } : c;
+      });
+      return { ...t, clips: sortClips(kept) };
+    }),
+  };
+}
+
+export function selectAllIds(p: Project): string[] {
+  return p.tracks.flatMap((t) => t.clips.map((c) => c.id));
+}
+
+export interface ClipboardData {
+  items: { trackId: string; trackKind: TrackKind; clip: Clip }[];
+  minStart: number;
+  maxEnd: number;
+}
+
+export function copyClips(p: Project, ids: string[]): ClipboardData | null {
+  const set = new Set(clipIdsOnly(ids));
+  const items: ClipboardData['items'] = [];
+  for (const t of p.tracks) for (const c of t.clips) if (set.has(c.id)) items.push({ trackId: t.id, trackKind: t.kind, clip: c });
+  if (!items.length) return null;
+  return {
+    items,
+    minStart: Math.min(...items.map((i) => i.clip.start)),
+    maxEnd: Math.max(...items.map((i) => i.clip.start + i.clip.duration)),
+  };
+}
+
+/**
+ * Cola o conteúdo copiado com o primeiro clip em `at`, mantendo as posições relativas.
+ * Usa as mesmas pistas se houver espaço para todos; senão cria pistas novas.
+ */
+export function pasteClips(p: Project, cb: ClipboardData, at: number): { project: Project; created: string[] } {
+  const offset = Math.max(0, Math.round(at)) - cb.minStart;
+  const idMap = new Map<string, string>();
+  for (const it of cb.items) idMap.set(it.clip.id, uid('c'));
+  const fresh = cb.items.map((it) => {
+    const c = it.clip;
+    const pairedAudio = c.detachedAudioId && idMap.get(c.detachedAudioId);
+    return {
+      ...it,
+      clip: {
+        ...c,
+        id: idMap.get(c.id)!,
+        start: c.start + offset,
+        detachedAudioId: pairedAudio || undefined,
+        keyframes: c.keyframes?.map((k) => ({ ...k, id: uid('k') })),
+      } as Clip,
+    };
+  });
+  let project = p;
+  const fitsOriginal = fresh.every((it) => {
+    const t = project.tracks.find((x) => x.id === it.trackId);
+    return t && overlaps(t, it.clip.start, it.clip.duration).length === 0;
+  });
+  const targetOf = new Map<string, string>();
+  for (const it of fresh) {
+    if (targetOf.has(it.trackId)) continue;
+    const orig = project.tracks.find((x) => x.id === it.trackId);
+    if (fitsOriginal && orig) targetOf.set(it.trackId, orig.id);
+    else {
+      const r = addTrack(project, it.trackKind, it.trackKind === 'video');
+      project = r.project;
+      targetOf.set(it.trackId, r.trackId);
+    }
+  }
+  for (const it of fresh) {
+    const tid = targetOf.get(it.trackId)!;
+    project = mapTrack(project, tid, (t) => ({ ...t, clips: sortClips([...t.clips, it.clip]) }));
+  }
+  return { project, created: fresh.map((f) => f.clip.id) };
+}

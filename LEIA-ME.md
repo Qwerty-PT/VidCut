@@ -11,6 +11,10 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - Mover clips (também entre pistas do mesmo tipo), aparar pelas pontas, dividir, apagar
 - Três tipos de divisão, como no CapCut: dividir (`S`), dividir e eliminar à esquerda (`Q`) e dividir e eliminar à direita (`W`). Nos dois últimos, o espaço que fica é fechado (os clips seguintes da mesma pista encostam)
 - Cabeça de leitura arrastável: pela pega no topo (na régua) ou agarrando a própria linha em qualquer ponto (o cursor muda ao passar por cima)
+- **Seleção múltipla**: arrastar numa zona vazia da timeline desenha um retângulo que seleciona os clips que toca (`Shift`/`Cmd` para juntar à seleção); `Cmd+A` seleciona tudo. Arrastar um dos clips selecionados move o grupo todo (cada um na sua pista, sem saltar por cima de outros)
+- **Copiar / cortar / colar / duplicar**: `Cmd+C`, `Cmd+X`, `Cmd+V` (cola na cabeça de leitura, mantendo as posições relativas; se não houver espaço cria pistas novas), `Cmd+D` (duplica logo a seguir). Num campo de texto, estes atalhos funcionam no texto
+- **Apagar e fechar espaço** (ripple): `Shift+Delete` ou botão direito → "Apagar e fechar espaço"; os clips seguintes da mesma pista encostam
+- **Forma de onda real** nos clips de áudio e numa faixa por baixo dos vídeos com som (calculada com o ffmpeg, guardada em cache)
 - Íman: encaixa nas pontas de outros clips e na cabeça de leitura
 - Magnet ao largar media: o clip cola-se ao fim do clip anterior nessa pista (ou ao início, se a pista estiver vazia). Com o íman desligado, fica onde o largaste
 - Zoom da timeline até ao frame (cerca de 0,3 s visíveis; a régua passa a mostrar frames): arrastar as pontas da barra de navegação (por baixo das pistas), pinça no trackpad, `Ctrl`/`Cmd` + roda, slider, `+` / `-` / `0`
@@ -72,6 +76,10 @@ Notas:
 | `Q` | Dividir e eliminar à esquerda da cabeça de leitura |
 | `W` | Dividir e eliminar à direita da cabeça de leitura |
 | `Delete` / `Backspace` | Apagar seleção |
+| `Shift+Delete` | Apagar e fechar o espaço |
+| `Cmd+C` / `Cmd+X` / `Cmd+V` | Copiar / cortar / colar clips |
+| `Cmd+D` | Duplicar |
+| `Cmd+A` | Selecionar tudo |
 | `←` / `→` | Frame anterior / seguinte (`Shift`: 1 segundo) |
 | `Home` / `End` | Início / fim |
 | `+` / `-` / `0` | Zoom da timeline / ajustar ao projeto |
@@ -131,8 +139,6 @@ Para repetir o teste de export: `sh scripts/make-test-media.sh && node scripts/t
 ## Limitações conhecidas
 
 - A pré-visualização usa o leitor de vídeo do Chromium: H.264, VP8/VP9 e AV1 funcionam; HEVC/H.265 e alguns MKV podem não pré-visualizar (o export usa ffmpeg e lida com mais formatos)
-- Sem forma de onda real nos clips de áudio (é um padrão gráfico)
-- Seleção múltipla só serve para apagar/dividir; mover arrasta um clip de cada vez
 - Depois de separar, vídeo e áudio ficam independentes (mover um não move o outro). Se dividires o vídeo depois de separar, só a metade da esquerda volta a juntar o áudio automaticamente
 - A app só funciona dentro do Electron (no browser mostra um aviso)
 
@@ -143,6 +149,7 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 ## Plano
 
 5. ~~Modelos Remotion (aba Modelos, painel automático, pasta modelos/)~~ (feito)
+6. ~~Edição rápida: seleção múltipla, copiar/colar/duplicar, ripple, forma de onda~~ (feito)
 
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)

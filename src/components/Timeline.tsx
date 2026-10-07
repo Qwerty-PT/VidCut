@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
@@ -10,6 +10,8 @@ import { MEDIA_DRAG_TYPE, TEMPLATE_DRAG_TYPE } from './MediaBin';
 import { getTemplate } from '../../shared/templates';
 import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
+import { usePeaks, wavePath } from '../peaks';
+import { clipSpeed } from '../../shared/types';
 
 const HEADER_W = 156;
 const RULER_H = 30;
@@ -187,6 +189,12 @@ export const Timeline: React.FC = () => {
       dispatch({ type: 'select', ids: selection.includes(clip.id) ? selection.filter((id) => id !== clip.id) : [...selection, clip.id] });
       return;
     }
+    // vários clips selecionados e arrastar um deles: move o grupo todo
+    const selClips = selection.filter((id) => !id.startsWith('tr:'));
+    if (mode === 'move' && selClips.includes(clip.id) && selClips.length > 1) {
+      onGroupDown(e, clip, selClips);
+      return;
+    }
     if (!selection.includes(clip.id) || selection.length > 1) dispatch({ type: 'select', ids: [clip.id] });
 
     const points = new Set<number>([0, playhead.frame]);
@@ -329,11 +337,63 @@ export const Timeline: React.FC = () => {
     window.addEventListener('pointerup', up);
   };
 
+  /** Arrastar um grupo de clips selecionados (mantém pistas; não salta por cima de outros) */
+  const onGroupDown = (e: React.PointerEvent, clip: Clip, ids: string[]) => {
+    const set = new Set(ids);
+    const points = new Set<number>([0, playhead.frame]);
+    for (const t of projectRef.current.tracks) for (const c of t.clips) if (!set.has(c.id)) { points.add(c.start); points.add(c.start + c.duration); }
+    const pts = [...points];
+    const x0 = e.clientX;
+    let started = false;
+    const move = (ev: PointerEvent) => {
+      if (!started) { if (Math.abs(ev.clientX - x0) < 3) return; started = true; playhead.pause(); dispatch({ type: 'beginGesture' }); }
+      let d = Math.round((ev.clientX - x0) / z);
+      const a = snapValue(clip.start + d, pts), b = snapValue(clip.start + clip.duration + d, pts);
+      let line: number | null = null;
+      if (a.snapped !== null) { d = a.value - clip.start; line = a.snapped; } else if (b.snapped !== null) { d = b.value - clip.start - clip.duration; line = b.snapped; }
+      setSnapLine(line);
+      dispatch({ type: 'gesture', fn: (p) => moveClips(p, ids, d) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setSnapLine(null);
+      if (started) dispatch({ type: 'endGesture' });
+      else dispatch({ type: 'select', ids: [clip.id] }); // clique simples: fica só este
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  // clique numa zona vazia: move a cabeça de leitura; arrastar: seleção em retângulo
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const onLaneDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    dispatch({ type: 'select', ids: [] });
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    const base = additive ? selection.filter((id) => !id.startsWith('tr:')) : [];
+    if (!additive) dispatch({ type: 'select', ids: [] });
     playhead.pause();
     playhead.seek(clamp(Math.round(frameAtClientX(e.clientX)), 0, duration - 1));
+    const x0 = e.clientX, y0 = e.clientY;
+    let active = false;
+    const move = (ev: PointerEvent) => {
+      if (!active) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return; active = true; }
+      const r = { x0: Math.min(x0, ev.clientX), y0: Math.min(y0, ev.clientY), x1: Math.max(x0, ev.clientX), y1: Math.max(y0, ev.clientY) };
+      setMarquee(r);
+      const hit: string[] = [];
+      scrollRef.current?.querySelectorAll<HTMLElement>('[data-clip-id]').forEach((el) => {
+        const b = el.getBoundingClientRect();
+        if (b.right >= r.x0 && b.left <= r.x1 && b.bottom >= r.y0 && b.top <= r.y1) hit.push(el.dataset.clipId!);
+      });
+      dispatch({ type: 'select', ids: [...new Set([...base, ...hit])] });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setMarquee(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
   // ---------- largar media ----------
@@ -466,6 +526,7 @@ export const Timeline: React.FC = () => {
         </div>
       </div>
 
+      {marquee && <div className="tl-marquee" style={{ left: marquee.x0, top: marquee.y0, width: marquee.x1 - marquee.x0, height: marquee.y1 - marquee.y0 }} />}
       <div className="tl-nav">
         <div className="tl-nav-label" style={{ width: HEADER_W }}>{visibleLabel(visW / pps)} visíveis</div>
         <div className="tl-nav-track" ref={navRef} onPointerDown={(e) => onNavDown(e, 'track')} title="Arrasta para navegar; arrasta as pontas para aproximar/afastar">
@@ -503,6 +564,9 @@ export const Timeline: React.FC = () => {
               </button>
             )}
             <div className="ctx-sep" />
+            <button role="menuitem" onPointerDown={run(() => commit((p) => rippleDelete(p, selection.includes(menu.clipId) ? selection : [menu.clipId]), []))}>
+              <Icon name="trash" size={15} /> Apagar e fechar espaço <kbd>⇧Del</kbd>
+            </button>
             <button role="menuitem" className="danger" onPointerDown={run(() => commit((p) => deleteClips(p, selection.includes(menu.clipId) ? selection : [menu.clipId]), []))}>
               <Icon name="trash" size={15} /> Apagar <kbd>Del</kbd>
             </button>
@@ -593,6 +657,7 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
               media={media}
               trackKind={track.kind}
               z={z}
+              fps={project.fps}
               selected={selection.includes(clip.id)}
               onDown={(e, mode) => onClipDown(e, clip, track, mode)}
               onMenu={(e) => onClipMenu(e, clip)}
@@ -644,11 +709,12 @@ const ClipView: React.FC<{
   media?: MediaItem;
   trackKind: Track['kind'];
   z: number;
+  fps: number;
   selected: boolean;
   onDown: (e: React.PointerEvent, mode: ClipMode) => void;
   onMenu: (e: React.MouseEvent) => void;
   onKeyframeDown: (e: React.PointerEvent, kf: Keyframe) => void;
-}> = React.memo(({ clip, media, trackKind, z, selected, onDown, onMenu, onKeyframeDown }) => {
+}> = React.memo(({ clip, media, trackKind, z, fps, selected, onDown, onMenu, onKeyframeDown }) => {
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
@@ -659,11 +725,12 @@ const ClipView: React.FC<{
     <div
       className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
+      data-clip-id={clip.id}
       onPointerDown={(e) => onDown(e, 'move')}
       onContextMenu={onMenu}
       title={clip.text ? clip.text.text : media?.name}
     >
-      {kind === 'audio' && <div className="clip-wave" />}
+      {(kind === 'audio' || (kind === 'video' && !clip.audioDetached)) && <ClipWave clip={clip} path={media?.path} fps={fps} width={w} full={kind === 'audio'} />}
       {(fi > 0 || fo > 0) && (
         <svg className="clip-fades" width={w} height="100%" viewBox={`0 0 ${w} 100`} preserveAspectRatio="none">
           {fi > 0 && <polygon points={`0,0 ${fi},0 0,100`} />}
@@ -705,3 +772,18 @@ const ClipView: React.FC<{
   );
 });
 ClipView.displayName = 'ClipView';
+
+/** Forma de onda real do excerto do clip (picos do ficheiro, via ffmpeg) */
+const ClipWave: React.FC<{ clip: Clip; path?: string; fps: number; width: number; full: boolean }> = ({ clip, path, fps, width, full }) => {
+  const peaks = usePeaks(path);
+  const from = clip.trimStart / fps;
+  const to = (clip.trimStart + clip.duration * clipSpeed(clip)) / fps;
+  const maxPts = Math.max(8, Math.min(1500, Math.ceil(width / 2)));
+  const wave = useMemo(() => (peaks && peaks.length ? wavePath(peaks, from, to, maxPts, full) : null), [peaks, from, to, maxPts, full]);
+  if (!wave) return full ? <div className="clip-wave" /> : null;
+  return (
+    <svg className={`clip-wave-svg${full ? ' full' : ' strip'}`} viewBox={`0 0 ${Math.max(1, wave.n - 1)} 100`} preserveAspectRatio="none" aria-hidden>
+      <path d={wave.d} />
+    </svg>
+  );
+};

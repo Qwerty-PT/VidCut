@@ -574,3 +574,11 @@ body.tf-dragging, body.tf-dragging * { user-select: none; }
 .num-row { display: grid; grid-template-columns: 1fr 76px; gap: 8px; align-items: center; }
 .num-row input[type='number'] { height: 28px; padding: 0 6px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); }
 .tpl-fields .field input[type='text'] { width: 100%; }
+
+.tl-marquee { position: fixed; z-index: 40; border: 1px solid var(--amber); background: rgba(242, 179, 61, 0.1); pointer-events: none; }
+
+.clip-wave-svg { position: absolute; left: 0; width: 100%; pointer-events: none; }
+.clip-wave-svg.full { top: 20%; height: 72%; }
+.clip-wave-svg.full path { fill: rgba(255, 255, 255, 0.45); }
+.clip-wave-svg.strip { bottom: 0; height: 26%; background: rgba(10, 30, 32, 0.55); }
+.clip-wave-svg.strip path { fill: rgba(120, 220, 205, 0.75); }

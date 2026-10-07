@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('vidcut', {
   exportVideo: (project) => ipcRenderer.invoke('export:start', project),
   cancelExport: () => ipcRenderer.invoke('export:cancel'),
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
+  peaks: (file) => ipcRenderer.invoke('media:peaks', file),
+  nativeEdit: (action) => ipcRenderer.invoke('edit:native', action),
   onExportProgress: (cb) => {
     const h = (_e, p) => cb(p);
     ipcRenderer.on('export:progress', h);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } 
 import { api } from './api';
 import { EditorProvider, type EditorCtx } from './editor-context';
 import { initialState, reducer } from './state';
-import { addClip, addMedia, addTextClip, deleteClips } from './ops';
+import { addClip, addMedia, addTextClip, copyClips, deleteClips, pasteClips, rippleDelete, selectAllIds, type ClipboardData } from './ops';
 import { probeMedia, refreshThumbs } from './media';
 import { playhead } from './playhead';
 import { isTyping } from './util';
@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [exporting, setExporting] = useState<ExportState | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const clipboard = useRef<ClipboardData | null>(null);
   const dirty = state.savedProject !== state.project;
   const inElectron = !!window.vidcut;
 
@@ -157,7 +158,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (!inElectron) return;
-    return api().onMenu((cmd) => {
+    const run = (cmd: string) => {
       const a = actions.current;
       const typing = isTyping({ target: document.activeElement } as unknown as Event);
       switch (cmd) {
@@ -167,10 +168,33 @@ export const App: React.FC = () => {
         case 'saveAs': a.doSave(true); break;
         case 'import': a.doImport(); break;
         case 'export': a.doExport(); break;
-        case 'undo': if (typing) document.execCommand('undo'); else dispatch({ type: 'undo' }); break;
-        case 'redo': if (typing) document.execCommand('redo'); else dispatch({ type: 'redo' }); break;
+        case 'undo': if (typing) api().nativeEdit('undo'); else dispatch({ type: 'undo' }); break;
+        case 'redo': if (typing) api().nativeEdit('redo'); else dispatch({ type: 'redo' }); break;
+        case 'copy': case 'cut': case 'paste': case 'selectAll': case 'duplicate': {
+          if (typing) { if (cmd !== 'duplicate') api().nativeEdit(cmd); break; }
+          const s = stateRef.current;
+          if (cmd === 'selectAll') { dispatch({ type: 'select', ids: selectAllIds(s.project) }); break; }
+          if (cmd === 'copy' || cmd === 'cut' || cmd === 'duplicate') {
+            const cb = copyClips(s.project, s.selection);
+            if (!cb) break;
+            if (cmd === 'duplicate') {
+              commit((p) => { const r = pasteClips(p, cb, cb.maxEnd); return { project: r.project, select: r.created }; });
+              break;
+            }
+            clipboard.current = cb;
+            if (cmd === 'cut') commit((p) => deleteClips(p, s.selection), []);
+            notify(`${cb.items.length} clip${cb.items.length > 1 ? 's' : ''} ${cmd === 'cut' ? 'cortado' : 'copiado'}${cb.items.length > 1 ? 's' : ''}`);
+            break;
+          }
+          const cb = clipboard.current;
+          if (cb) commit((p) => { const r = pasteClips(p, cb, playhead.frame); return { project: r.project, select: r.created }; });
+          break;
+        }
       }
-    });
+    };
+    // também acessível como window.__vidcutCommand('copy') (útil para testes e atalhos futuros)
+    (window as unknown as { __vidcutCommand?: (c: string) => void }).__vidcutCommand = run;
+    return api().onMenu(run);
   }, [inElectron]);
 
   useEffect(() => {
@@ -202,7 +226,8 @@ export const App: React.FC = () => {
           break;
         }
         case 'Delete': case 'Backspace':
-          if (s.selection.length) { e.preventDefault(); commit((p) => deleteClips(p, s.selection), []); }
+          // Shift+Delete: apaga e fecha o espaço (ripple)
+          if (s.selection.length) { e.preventDefault(); commit((p) => (e.shiftKey ? rippleDelete(p, s.selection) : deleteClips(p, s.selection)), []); }
           break;
         case 'ArrowLeft': e.preventDefault(); playhead.pause(); playhead.seek(Math.max(0, playhead.frame - (e.shiftKey ? s.project.fps : 1))); break;
         case 'ArrowRight': e.preventDefault(); playhead.pause(); playhead.seek(Math.min(dur - 1, playhead.frame + (e.shiftKey ? s.project.fps : 1))); break;
