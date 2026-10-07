@@ -65,6 +65,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -132,6 +138,9 @@
       ],
       "deleteAppDataOnUninstall": false
     },
-    "publish": null
+    "publish": null,
+    "portable": {
+      "artifactName": "${productName}-${version}-Portatil.${ext}"
+    }
   }
 }

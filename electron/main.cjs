@@ -11,6 +11,11 @@ const appRoot = path.join(__dirname, '..');
 
 // Na app empacotada, o Chrome headless do Remotion é descarregado para a pasta de dados
 // do utilizador (a pasta da app é só de leitura). Em dev fica em node_modules/.remotion.
+// Versão portátil do Windows: os dados ficam ao lado do .exe (dá para levar numa pen)
+if (process.env.PORTABLE_EXECUTABLE_DIR) {
+  app.setPath('userData', path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'VidCut-dados'));
+}
+
 if (app.isPackaged) {
   const fsSync = require('node:fs');
   const dataDir = app.getPath('userData');
