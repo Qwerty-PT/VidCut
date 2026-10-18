@@ -15,6 +15,9 @@ import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
 import { AspectMenu } from './AspectMenu';
 import { SafeZoneMenu, SafeZoneOverlay } from './SafeZones';
+import { EFFECT_DRAG_TYPE } from './EffectsLibrary';
+import { getEffect } from '../../shared/effects';
+import { addEffect, effectTarget } from '../ops';
 import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
 
 export const Preview: React.FC = () => {
@@ -102,12 +105,21 @@ export const Preview: React.FC = () => {
         <div
           className={`preview-frame${dropOver ? ' drop-over' : ''}`}
           style={{ aspectRatio: `${project.width} / ${project.height}` }}
-          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
           onDragLeave={() => setDropOver(false)}
           onDrop={(e) => {
             setDropOver(false);
             const lid = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
             const tid = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
+            const fxid = e.dataTransfer.getData(EFFECT_DRAG_TYPE);
+            if (fxid) {
+              e.preventDefault();
+              clearPreview();
+              const target = effectTarget(project, state.selection, playhead.frame);
+              const def = getEffect(fxid);
+              if (target && def) commit((p) => ({ project: addEffect(p, target, fxid, def.intensity), select: [target] }));
+              return;
+            }
             if (!lid && !tid) return;
             e.preventDefault();
             clearPreview();

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>VidCut a gravar</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; font: 13px -apple-system, "Segoe UI", system-ui, sans-serif; user-select: none; }
+  .bar { height: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px;
+    background: rgba(23, 25, 30, 0.94); color: #e4e6eb; border-radius: 26px; border: 1px solid #333843; -webkit-app-region: drag; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #e0645a; animation: b 1s steps(2, start) infinite; flex: none; }
+  @keyframes b { to { visibility: hidden; } }
+  .t { font: 600 14px ui-monospace, Menlo, monospace; min-width: 52px; }
+  .k { color: #646b77; font-size: 11px; flex: 1; white-space: nowrap; }
+  button { -webkit-app-region: no-drag; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: #f2b33d; color: #2b1d00; font: 600 13px inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  button i { width: 10px; height: 10px; background: currentColor; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="bar"><span class="dot"></span><span class="t" id="t">0:00</span><span class="k" id="k"></span><button id="s" title="Parar a gravação"><i></i>Parar</button></div>
+<script>
+  document.getElementById('s').onclick = () => window.rec.stop();
+  window.rec.onTick((t) => {
+    const p = String(t).split('|');
+    document.getElementById('t').textContent = p[0];
+    document.getElementById('k').textContent = p[1] || '';
+  });
+</script>
+</body>
+</html>

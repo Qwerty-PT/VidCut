@@ -4,7 +4,7 @@ import type { CaptionStyle, Clip, ClipColor, ClipTransform, KfEasing, KfProp, Lo
 import { lottieInfo } from '../shared/lottie';
 import { captionText, retimeWords, sliceCaption } from '../shared/captions';
 import { clipSpeed } from '../shared/types';
-import { DEFAULT_TRANSFORM, getTransform, isDefaultTransform } from '../shared/transform';
+import { DEFAULT_TRANSFORM, applyLayoutPreset, getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
 import { getTemplate } from '../shared/templates';
 import { applyTheme, supportsThemes, templateDefaults } from '../shared/template-api';
@@ -865,4 +865,81 @@ export function addAudioAt(p: Project, mediaId: string, start: number): { projec
   const r = audioTrackFor(p, start, duration);
   const clip: Clip = { id: uid('c'), mediaId, start, duration, trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0 };
   return { project: mapTrack(r.project, r.trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) })), clipId: clip.id };
+}
+
+// ---------- efeitos ----------
+/** O clip aceita efeitos? (vídeo, imagem, modelo, animação — não texto nem áudio) */
+export function acceptsEffects(p: Project, clipId: string): boolean {
+  const f = findClip(p, clipId);
+  if (!f || f.track.kind === 'audio' || f.clip.text) return false;
+  if (f.clip.template || f.clip.lottie) return true;
+  const m = p.media.find((x) => x.id === f.clip.mediaId);
+  return !!m && (m.kind === 'video' || m.kind === 'image');
+}
+
+/** Clip a que se aplica um efeito: o selecionado (se aceitar) ou o de cima que está na agulha */
+export function effectTarget(p: Project, selection: string[], frame: number): string | null {
+  for (const id of selection) if (acceptsEffects(p, id)) return id;
+  for (const t of p.tracks) {
+    if (t.kind !== 'video' || t.hidden) continue;
+    const c = t.clips.find((x) => frame >= x.start && frame < x.start + x.duration && acceptsEffects(p, x.id));
+    if (c) return c.id;
+  }
+  return null;
+}
+
+export function addEffect(p: Project, clipId: string, effectId: string, intensity: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const list = (f.clip.effects ?? []).filter((e) => e.id !== effectId);
+  return updateClip(p, clipId, { effects: [...list, { id: effectId, intensity }] });
+}
+export function setEffectIntensity(p: Project, clipId: string, effectId: string, intensity: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  return updateClip(p, clipId, { effects: (f.clip.effects ?? []).map((e) => (e.id === effectId ? { ...e, intensity } : e)) });
+}
+export function removeEffect(p: Project, clipId: string, effectId: string): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const list = (f.clip.effects ?? []).filter((e) => e.id !== effectId);
+  return updateClip(p, clipId, { effects: list.length ? list : undefined });
+}
+
+/**
+ * Põe uma gravação de ecrã (e/ou câmara) na agulha: o ecrã numa pista de vídeo livre (ou nova, em baixo),
+ * a câmara numa pista nova por cima, num canto (imagem dentro de imagem). Só câmara: ocupa o quadro.
+ */
+export function placeRecording(p: Project, at: number, screenId: string | null, camId: string | null): { project: Project; select: string[] } {
+  let project = p;
+  const select: string[] = [];
+  const put = (mediaId: string, trackId: string, transform?: ClipTransform): string | null => {
+    const media = project.media.find((m) => m.id === mediaId);
+    if (!media) return null;
+    const src = sourceFrames(media, project.fps);
+    const duration = Number.isFinite(src) ? Math.max(1, src) : project.fps;
+    const clip: Clip = { id: uid('c'), mediaId, start: at, duration, trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0, ...(transform ? { transform } : {}) };
+    project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
+    return clip.id;
+  };
+  // por cima de tudo o que já está nesse intervalo (senão a gravação ficava tapada pelo vídeo de baixo)
+  const freeVideoTrack = (duration: number): string => {
+    const free = overlayTrack(project, at, duration);
+    if (free) return free.id;
+    const r = addTrack(project, 'video', true);
+    project = r.project;
+    return r.trackId;
+  };
+  const dur = (id: string) => { const m = project.media.find((x) => x.id === id); const s = m ? sourceFrames(m, project.fps) : 1; return Number.isFinite(s) ? s : project.fps; };
+  if (screenId) { const id = put(screenId, freeVideoTrack(dur(screenId))); if (id) select.push(id); }
+  if (camId) {
+    const media = project.media.find((m) => m.id === camId);
+    let trackId: string;
+    if (screenId) { const r = addTrack(project, 'video', true); project = r.project; trackId = r.trackId; }
+    else trackId = freeVideoTrack(dur(camId));
+    const tf = screenId ? applyLayoutPreset('pip-br', media, project.width, project.height, DEFAULT_TRANSFORM) : undefined;
+    const id = put(camId, trackId, tf);
+    if (id) select.push(id);
+  }
+  return { project, select };
 }

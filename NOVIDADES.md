@@ -2,6 +2,12 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.21.0
+
+- Biblioteca de efeitos (separador Efeitos): 20 efeitos em 5 grupos — Movimento (tremor, câmara na mão, pulsar, batida, zoom lento, balançar), Luz (brilho suave, fugas de luz, reflexo a passar, arco-íris, estroboscópio), Retro (VHS, película antiga, glitch, duotone), Partículas (neve, brilhos, bokeh) e Distorção (ondulação, foco a pulsar)
+- Clique num efeito mostra-o no clip selecionado; duplo clique ou arrastar para um clip aplica; vários efeitos por clip, com intensidade no separador Cor · Fx
+- Gravar ecrã e câmara (botão vermelho no separador Media): escolhe o ecrã ou uma janela, câmara e microfone; uma barrinha com Parar fica por cima de tudo (não aparece na gravação) e há um atalho para parar; no fim o ecrã vai para a agulha e a câmara fica num canto por cima
+
 ## 0.20.0
 
 - Congelar fotograma: botão na timeline (ou botão direito num vídeo) — a imagem fica 3 s na agulha e o resto da pista anda para a frente

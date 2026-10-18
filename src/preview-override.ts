@@ -78,3 +78,16 @@ export function lottiePreview(p: Project, asset: LottieAsset, at: number): Previ
   if (!c) return null;
   return { project: r.project, base: p, from: c.start, to: c.start + c.duration - 1, label: `${asset.name} — duplo clique para adicionar`, key: `lot:${asset.id}` };
 }
+
+/** Efeito aplicado ao clip, a repetir 3 s a partir da agulha (dentro do clip) */
+import { addEffect } from './ops';
+import { getEffect } from '../shared/effects';
+export function effectPreview(p: Project, clipId: string, effectId: string, at: number): PreviewOverride | null {
+  const f = findClip(p, clipId);
+  const def = getEffect(effectId);
+  if (!f || !def) return null;
+  const next = addEffect(p, clipId, effectId, def.intensity);
+  const end = f.clip.start + f.clip.duration - 1;
+  const from = Math.min(Math.max(f.clip.start, at), Math.max(f.clip.start, end - p.fps * 2));
+  return { project: next, base: p, from, to: Math.min(end, from + p.fps * 3), label: `${def.name} — duplo clique para aplicar`, key: `fx:${effectId}` };
+}

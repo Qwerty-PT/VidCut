@@ -35,6 +35,19 @@ contextBridge.exposeInMainWorld('vidcut', {
     ipcRenderer.on('export:progress', h);
     return () => ipcRenderer.removeListener('export:progress', h);
   },
+  recStatus: () => ipcRenderer.invoke('rec:status'),
+  recAskCamera: () => ipcRenderer.invoke('rec:askCamera'),
+  recSources: () => ipcRenderer.invoke('rec:sources'),
+  recChoose: (id, systemAudio) => ipcRenderer.invoke('rec:choose', { id, systemAudio }),
+  recStarted: (hide) => ipcRenderer.invoke('rec:started', { hide }),
+  recEnded: () => ipcRenderer.invoke('rec:ended'),
+  recTick: (text) => ipcRenderer.send('rec:tick', text),
+  recSave: (bytes, mime, kind) => ipcRenderer.invoke('rec:save', { bytes, mime, kind }),
+  onRecStop: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on('rec:stop-request', h);
+    return () => ipcRenderer.removeListener('rec:stop-request', h);
+  },
   micAccess: () => ipcRenderer.invoke('mic:access'),
   saveRecording: (bytes, mime) => ipcRenderer.invoke('recording:save', { bytes, mime }),
   extractFrame: (file, timeSec) => ipcRenderer.invoke('frame:extract', { file, timeSec }),

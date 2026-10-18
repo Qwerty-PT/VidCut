@@ -15,6 +15,8 @@ import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 import { FONT_LABEL } from '../../shared/fonts';
 import { addFont, isUserFont, userFontFamily, userFontId, userFontKey } from '../../shared/userfonts';
 import { FontPicker } from './FontPicker';
+import { getEffect } from '../../shared/effects';
+import { removeEffect, setEffectIntensity } from '../ops';
 import { CAPTION_STYLES, toSrt } from '../../shared/captions';
 import { api } from '../api';
 
@@ -379,6 +381,36 @@ const COLOR_PRESETS: { label: string; c: Partial<ClipColor> }[] = [
   { label: 'Vintage', c: { sepia: 35, contrast: -10, saturation: -15, vignette: 45 } },
 ];
 
+/** Efeitos da biblioteca aplicados ao clip */
+export const EffectsSection: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { commit } = useEditor();
+  const list = clip.effects ?? [];
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h3 className="section-title">Efeitos</h3>
+        <button className="btn tiny" disabled={!list.length} onClick={() => commit((p) => updateClip(p, clip.id, { effects: undefined }))}>Tirar todos</button>
+      </div>
+      {list.length === 0 ? (
+        <p className="hint">Sem efeitos. Abre o separador <b>Efeitos</b> à esquerda: clique para ver no ecrã, duplo clique ou arrastar para aplicar.</p>
+      ) : list.map((e) => {
+        const def = getEffect(e.id);
+        return (
+          <div key={e.id} className="fx-row">
+            <div className="fx-row-head">
+              <span>{def?.name ?? e.id}</span>
+              <button className="icon-btn" title="Tirar este efeito" onClick={() => commit((p) => removeEffect(p, clip.id, e.id))}><Icon name="close" size={13} /></button>
+            </div>
+            <Row label="Intensidade" hint={`${e.intensity}%`}>
+              <Range min={0} max={100} step={1} value={e.intensity} apply={(v) => (p) => setEffectIntensity(p, clip.id, e.id, Math.round(v))} />
+            </Row>
+          </div>
+        );
+      })}
+    </section>
+  );
+};
+
 /** Ajustes de cor e efeitos (vídeo e imagem) */
 export const ColorSection: React.FC<{ clip: Clip }> = ({ clip }) => {
   const { commit } = useEditor();
@@ -392,7 +424,7 @@ export const ColorSection: React.FC<{ clip: Clip }> = ({ clip }) => {
   return (
     <section className="section">
       <div className="section-head">
-        <h3 className="section-title">Cor e efeitos</h3>
+        <h3 className="section-title">Cor</h3>
         <button className="btn tiny" disabled={!clip.color} onClick={() => commit((p) => updateClip(p, clip.id, { color: undefined }))}>Repor</button>
       </div>
       <div className="chip-row filters">
@@ -405,7 +437,7 @@ export const ColorSection: React.FC<{ clip: Clip }> = ({ clip }) => {
       {slider('saturation', 'Saturação', -100, 100)}
       {slider('temperature', 'Temperatura', -100, 100)}
       <details className="crop-box">
-        <summary>Efeitos</summary>
+        <summary>Desfocar, vinheta e sépia</summary>
         {slider('blur', 'Desfocar', 0, 40)}
         {slider('vignette', 'Vinheta', 0, 100)}
         {slider('sepia', 'Sépia', 0, 100)}

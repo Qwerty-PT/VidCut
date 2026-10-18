@@ -58,6 +58,8 @@ export interface Clip {
   lottie?: { assetId: string; loop: boolean };
   /** Fundo desfocado: enche as barras com o próprio vídeo/imagem ampliado e desfocado (1..100; ausente = desligado) */
   bgBlur?: number;
+  /** Efeitos da biblioteca (por ordem), com intensidade 0..100 */
+  effects?: { id: string; intensity: number }[];
 }
 
 export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';

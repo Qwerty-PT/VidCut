@@ -8,6 +8,7 @@ const { getPeaks, ffmpegPath } = require('./peaks.cjs');
 const { createLottieLibrary } = require('./lottie-lib.cjs');
 const { transcribeMedia, captionsStatus } = require('./captions.cjs');
 const { createUpdater } = require('./updater.cjs');
+const { setupScreenRecording } = require('./screen-rec.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -382,12 +383,10 @@ ipcMain.handle('update:install', async () => {
 app.setName('VidCut');
 app.whenReady().then(async () => {
   mediaBase = await mediaServer.listen();
-  // Permissões pedidas pela interface: microfone (narração) e fontes do sistema (texto). Mais nada.
-  const ALLOWED = new Set(['media', 'local-fonts']);
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb, details) => {
-    if (process.env.VIDCUT_DEBUG_PERMS) console.log('[permissão]', permission, JSON.stringify(details?.mediaTypes || ''));
-    cb(ALLOWED.has(permission) && (permission !== 'media' || !(details?.mediaTypes || []).includes('video')));
-  });
+  // Permissões pedidas pela interface: microfone e câmara (narração, gravar), captura de ecrã e fontes do sistema. Mais nada.
+  const ALLOWED = new Set(['media', 'local-fonts', 'display-capture']);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(ALLOWED.has(permission)));
+  setupScreenRecording({ getWin: () => win, ffmpegPath, registerMedia: (paths) => mediaServer.register(paths) });
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED.has(permission));
   buildMenu();
   createWindow();

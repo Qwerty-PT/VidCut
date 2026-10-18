@@ -14,6 +14,7 @@ import { animatedTransform } from './keyframes';
 import { getTemplate } from './templates';
 import { TemplateDurationContext } from './template-api';
 import { fontFaceCss, userFontFamily, type FontAsset } from './userfonts';
+import { combineEffects } from './effects';
 
 /** Fontes próprias do projeto: injeta o @font-face e espera que carreguem antes de desenhar */
 const ProjectFonts: React.FC<{ fonts?: Record<string, FontAsset> }> = ({ fonts }) => {
@@ -146,12 +147,20 @@ const VisualClip: React.FC<{
   const sp = clipSpeed(clip);
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
   // caixa posicionada/transformada com filtros de cor; a media enche a caixa
-  const frameBox = (children: React.ReactNode) => (
-    <div style={{ ...mediaStyle(tf, clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
-      {children}
-      <ColorOverlays color={clip.color} />
-    </div>
-  );
+  const box = clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : media, W, H, tf.fit);
+  const fx = combineEffects(clip.effects, { clipId: clip.id, t: clampFrame(from + local - clip.start, clip.duration), fps, dur: clip.duration, w: box.w, h: box.h, k: H / 1080 });
+  const frameBox = (children: React.ReactNode) => {
+    const ms = mediaStyle(tf, box);
+    const filter = [colorFilter(clip.color, H), fx?.filter].filter(Boolean).join(' ') || undefined;
+    return (
+      <div style={{ ...ms, transform: fx?.transform ? `${ms.transform} ${fx.transform}` : ms.transform, filter }}>
+        {fx?.svg}
+        {children}
+        <ColorOverlays color={clip.color} />
+        {fx?.overlay}
+      </div>
+    );
+  };
 
   if (clip.template) {
     const def = getTemplate(clip.template.id);

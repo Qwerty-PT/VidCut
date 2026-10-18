@@ -56,6 +56,15 @@ export interface VidCutApi {
   lottieRename(id: string, name: string): Promise<boolean>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
   onMenu(cb: (cmd: string) => void): () => void;
+  recStatus(): Promise<{ platform: string; screen: string; camera: string; microphone: string; systemAudio: boolean; shortcut: string }>;
+  recAskCamera(): Promise<boolean>;
+  recSources(): Promise<{ id: string; name: string; type: 'screen' | 'window'; thumb: string }[]>;
+  recChoose(id: string, systemAudio: boolean): Promise<boolean>;
+  recStarted(hide: boolean): Promise<boolean>;
+  recEnded(): Promise<boolean>;
+  recTick(text: string): void;
+  recSave(bytes: ArrayBuffer, mime: string, kind: 'ecra' | 'camara'): Promise<{ path: string }>;
+  onRecStop(cb: () => void): () => void;
   micAccess(): Promise<boolean>;
   saveRecording(bytes: ArrayBuffer, mime: string): Promise<{ path: string }>;
   extractFrame(file: string, timeSec: number): Promise<{ path?: string; error?: string }>;

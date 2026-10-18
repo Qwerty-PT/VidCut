@@ -8,7 +8,7 @@ import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
-import { CaptionSection, AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
@@ -177,7 +177,7 @@ export const Inspector: React.FC = () => {
       </header>
       {hasTabs && (
         <div className="tabs" role="tablist">
-          {([['basic', clip.template ? 'Modelo' : 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
+          {([['basic', clip.template ? 'Modelo' : 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor · Fx'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={curTab === id} className={curTab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
@@ -258,7 +258,7 @@ export const Inspector: React.FC = () => {
           </>
         )}
         {curTab === 'frame' && media && <TransformSection clip={clip} media={media} />}
-        {curTab === 'color' && <ColorSection clip={clip} />}
+        {curTab === 'color' && <><EffectsSection clip={clip} /><ColorSection clip={clip} /></>}
         {curTab === 'anim' && <AnimSection clip={clip} isText={false} fps={fps} />}
       </div>
     </aside>

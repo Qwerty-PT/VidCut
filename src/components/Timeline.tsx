@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { FREEZE_SEC, addMedia, freezeFrame, sourceTimeAt, addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { acceptsEffects, addEffect, FREEZE_SEC, addMedia, freezeFrame, sourceTimeAt, addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { getLottieEntry } from '../lottie-registry';
 import { openCaptions } from '../captions-ui';
 import { getTemplateTheme } from '../template-theme';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
+import { EFFECT_DRAG_TYPE } from './EffectsLibrary';
+import { getEffect } from '../../shared/effects';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange, probeMedia } from '../media';
@@ -465,7 +467,7 @@ export const Timeline: React.FC = () => {
   };
 
   // ---------- largar media ----------
-  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
+  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
 
   const onDrop = async (e: React.DragEvent, trackId: string | undefined, newTrack = false) => {
     e.preventDefault();
@@ -476,6 +478,18 @@ export const Timeline: React.FC = () => {
     const templateId = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
     const lottieId = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
     const lottieEntry = lottieId ? getLottieEntry(lottieId) : undefined;
+    const effectId = e.dataTransfer.getData(EFFECT_DRAG_TYPE);
+    if (effectId) {
+      // efeito largado em cima de um clip: aplica-se a esse clip
+      const tr = project.tracks.find((t) => t.id === trackId);
+      const target = tr?.clips.find((c) => start >= c.start && start < c.start + c.duration);
+      const def = getEffect(effectId);
+      if (!def) return;
+      if (!target || !acceptsEffects(project, target.id)) { notify('Larga o efeito em cima de um clip de vídeo, imagem, modelo ou animação.', 'error'); return; }
+      commit((p) => ({ project: addEffect(p, target.id, effectId, def.intensity), select: [target.id] }));
+      notify(`Efeito "${def.name}" aplicado. Ajusta a intensidade no separador Cor · Fx.`);
+      return;
+    }
     if (lottieEntry) {
       commit((p) => {
         const r = addLottieClip(p, { id: lottieEntry.id, name: lottieEntry.name, data: lottieEntry.data }, start, { trackId, newTrack, magnet: snap });
@@ -831,6 +845,7 @@ const ClipView: React.FC<{
       {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
+      {clip.effects?.length && w > 70 ? <span className="clip-badge fx" title={clip.effects.map((x) => getEffect(x.id)?.name ?? x.id).join(', ')}>fx{clip.effects.length > 1 ? ` ${clip.effects.length}` : ''}</span> : null}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}
       {clip.keyframes?.map((kf) => (
         <div
