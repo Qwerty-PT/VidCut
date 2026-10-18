@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld('vidcut', {
   loudness: (file, start, dur) => ipcRenderer.invoke('audio:loudness', { file, start, dur }),
   beats: (file) => ipcRenderer.invoke('audio:beats', file),
   scenes: (o) => ipcRenderer.invoke('video:scenes', o),
+  envelope: (file, start, dur) => ipcRenderer.invoke('audio:envelope', { file, start, dur }),
+  denoise: (file, strength) => ipcRenderer.invoke('audio:denoise', { file, strength }),
+  onAudioProgress: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on('audio:progress', h);
+    return () => ipcRenderer.removeListener('audio:progress', h);
+  },
   soundsList: () => ipcRenderer.invoke('sounds:list'),
   soundsUse: (file) => ipcRenderer.invoke('sounds:use', file),
   updateCheck: () => ipcRenderer.invoke('update:check'),

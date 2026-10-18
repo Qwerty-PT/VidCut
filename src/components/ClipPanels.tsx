@@ -19,6 +19,11 @@ import { getEffect } from '../../shared/effects';
 import { removeEffect, setEffectIntensity } from '../ops';
 import { CAPTION_STYLES, toSrt } from '../../shared/captions';
 import { api } from '../api';
+import { denoiseClip, duckMusic, replaceWithFile, restoreOriginalSound } from '../analysis-ui';
+import { openModal } from '../modals';
+import { RAMP_MAX, RAMP_MIN, RAMP_PRESETS, presetRamp, speedAtU, uAtRel } from '../../shared/speedramp';
+import { setSpeedRamp } from '../ops';
+import type { Project, RampPoint } from '../../shared/types';
 import { addVolKey, clearVolKeys, setVolumeAt, clipBeatFrames, updateSticker } from '../ops';
 import { volumeAt, toDb } from '../../shared/volume';
 import { normalizeClips, detectBeats, syncToBeats, splitOnBeats, splitScenes } from '../analysis-ui';
@@ -356,21 +361,111 @@ const fmtSpeed = (v: number) => `${v.toFixed(v < 1 ? 2 : 1).replace('.', ',')}×
 /** Velocidade do clip (vídeo e áudio) */
 export const SpeedSection: React.FC<{ clip: Clip; fps: number }> = ({ clip, fps }) => {
   const { commit } = useEditor();
+  const [mode, setMode] = React.useState<'normal' | 'curve'>(clip.speedRamp ? 'curve' : 'normal');
+  React.useEffect(() => { setMode(clip.speedRamp ? 'curve' : 'normal'); }, [clip.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const sp = clipSpeed(clip);
   const chips = [0.5, 1, 1.5, 2, 3];
   return (
     <section className="section">
-      <h3 className="section-title">Velocidade</h3>
-      <Row label="Velocidade" hint={`${fmtSpeed(sp)} · ${(clip.duration / fps).toFixed(1).replace('.', ',')} s`}>
-        <Range min={Math.log2(SPEED_MIN)} max={Math.log2(SPEED_MAX)} step={0.01} value={Math.log2(sp)} apply={(v) => (p) => setSpeed(p, clip.id, 2 ** v)} />
-      </Row>
-      <div className="chip-row">
-        {chips.map((c) => (
-          <button key={c} className={`chip${Math.abs(c - sp) < 0.005 ? ' on' : ''}`} onClick={() => commit((p) => setSpeed(p, clip.id, c))}>{fmtSpeed(c)}</button>
+      <div className="section-head">
+        <h3 className="section-title">Velocidade</h3>
+        {!clip.lottie && <Segmented label="Tipo de velocidade" value={mode} onChange={(m: 'normal' | 'curve') => setMode(m)} options={[{ value: 'normal', label: 'Normal' }, { value: 'curve', label: 'Curva' }]} />}
+      </div>
+      {mode === 'normal' ? (
+        <>
+          <Row label="Velocidade" hint={`${clip.speedRamp ? 'com curva' : fmtSpeed(sp)} · ${(clip.duration / fps).toFixed(1).replace('.', ',')} s`}>
+            <Range min={Math.log2(SPEED_MIN)} max={Math.log2(SPEED_MAX)} step={0.01} value={Math.log2(clip.speedRamp ? clip.speedRamp.src / clip.duration : sp)} apply={(v) => (p) => setSpeed(p, clip.id, 2 ** v)} />
+          </Row>
+          <div className="chip-row">
+            {chips.map((c) => (
+              <button key={c} className={`chip${!clip.speedRamp && Math.abs(c - sp) < 0.005 ? ' on' : ''}`} onClick={() => commit((p) => setSpeed(p, clip.id, c))}>{fmtSpeed(c)}</button>
+            ))}
+          </div>
+          <p className="hint">Mantém o mesmo excerto: o clip fica mais curto ou mais comprido e os clips seguintes da pista acompanham.{clip.audioDetached ? ' O áudio separado não muda: ajusta-o na pista de áudio.' : ''}</p>
+        </>
+      ) : <RampEditor clip={clip} fps={fps} />}
+    </section>
+  );
+};
+
+/** Miniatura de uma curva (para os botões dos presets) */
+const RampThumb: React.FC<{ points: RampPoint[] }> = ({ points }) => {
+  const W = 64, H = 26;
+  const y = (s: number) => H / 2 - (Math.log10(s) / 1) * (H / 2 - 2);
+  const d = Array.from({ length: 33 }, (_, i) => { const u = i / 32; return `${i ? 'L' : 'M'}${(u * W).toFixed(1)},${y(speedAtU(points, u)).toFixed(1)}`; }).join(' ');
+  return <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden><line x1="0" x2={W} y1={H / 2} y2={H / 2} className="ramp-mid" /><path d={d} className="ramp-line" /></svg>;
+};
+
+const RampEditor: React.FC<{ clip: Clip; fps: number }> = ({ clip, fps }) => {
+  const { commit, dispatch } = useEditor();
+  const frame = useFrame();
+  const ramp = clip.speedRamp;
+  const svg = React.useRef<SVGSVGElement>(null);
+  const W = 260, H = 130, PAD = 10;
+  const yOf = (s: number) => H / 2 - Math.log10(s) * (H / 2 - PAD);
+  const sOf = (y: number) => Math.min(RAMP_MAX, Math.max(RAMP_MIN, Math.pow(10, (H / 2 - y) / (H / 2 - PAD))));
+  const xOf = (u: number) => PAD + u * (W - 2 * PAD);
+  const uOf = (x: number) => Math.min(1, Math.max(0, (x - PAD) / (W - 2 * PAD)));
+  const local = (e: { clientX: number; clientY: number }) => {
+    const r = svg.current!.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+  };
+  const apply = (points: RampPoint[], gesture: boolean) => {
+    const fn = (p: Project) => setSpeedRamp(p, clip.id, { preset: 'personalizado', src: ramp?.src ?? 1, points });
+    if (gesture) dispatch({ type: 'gesture', fn }); else commit(fn);
+  };
+  const dragPoint = (e: React.PointerEvent, i: number) => {
+    if (!ramp || e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const pts0 = ramp.points;
+    dispatch({ type: 'beginGesture' });
+    const move = (ev: PointerEvent) => {
+      const q = local(ev);
+      const lo = i === 0 ? 0 : pts0[i - 1].u + 0.02, hi = i === pts0.length - 1 ? 1 : pts0[i + 1].u - 0.02;
+      const u = i === 0 ? 0 : i === pts0.length - 1 ? 1 : Math.min(hi, Math.max(lo, uOf(q.x)));
+      apply(pts0.map((p, j) => (j === i ? { u, s: Math.round(sOf(q.y) * 100) / 100 } : p)), true);
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); dispatch({ type: 'endGesture' }); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const playU = ramp && frame >= clip.start && frame <= clip.start + clip.duration ? uAtRel(ramp, clip.duration, frame - clip.start) : null;
+  return (
+    <div className="ramp-box">
+      <div className="ramp-presets">
+        {RAMP_PRESETS.map((pr) => (
+          <button key={pr.id} className={`ramp-preset${ramp?.preset === pr.id ? ' on' : ''}`} title={pr.hint}
+            onClick={() => commit((p) => setSpeedRamp(p, clip.id, presetRamp(pr.id, 1)))}>
+            <RampThumb points={pr.points} /><span>{pr.name}</span>
+          </button>
         ))}
       </div>
-      <p className="hint">Mantém o mesmo excerto: o clip fica mais curto ou mais comprido e os clips seguintes da pista acompanham.{clip.audioDetached ? ' O áudio separado não muda: ajusta-o na pista de áudio.' : ''}</p>
-    </section>
+      {ramp ? (
+        <>
+          <svg ref={svg} className="ramp-edit" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Curva de velocidade"
+            onDoubleClick={(e) => {
+              const q = local(e);
+              const u = uOf(q.x);
+              if (ramp.points.some((p) => Math.abs(p.u - u) < 0.03)) return;
+              apply([...ramp.points, { u, s: Math.round(sOf(q.y) * 100) / 100 }].sort((a, b) => a.u - b.u), false);
+            }}>
+            {[10, 4, 2, 1, 0.5, 0.25, 0.1].map((s) => (
+              <g key={s}><line x1={PAD} x2={W - PAD} y1={yOf(s)} y2={yOf(s)} className={s === 1 ? 'ramp-mid' : 'ramp-grid'} /><text x={2} y={yOf(s) + 3} className="ramp-lbl">{s >= 1 ? `${s}×` : `${String(s).replace('0.', ',')}`}</text></g>
+            ))}
+            {playU !== null && <line x1={xOf(playU)} x2={xOf(playU)} y1={PAD / 2} y2={H - PAD / 2} className="ramp-play" />}
+            <path className="ramp-line" d={Array.from({ length: 121 }, (_, i) => { const u = i / 120; return `${i ? 'L' : 'M'}${xOf(u).toFixed(1)},${yOf(speedAtU(ramp.points, u)).toFixed(1)}`; }).join(' ')} />
+            {ramp.points.map((p, i) => (
+              <circle key={i} cx={xOf(p.u)} cy={yOf(Math.min(RAMP_MAX, Math.max(RAMP_MIN, p.s)))} r={5} className="ramp-pt"
+                onPointerDown={(e) => dragPoint(e, i)}
+                onDoubleClick={(e) => { e.stopPropagation(); if (i > 0 && i < ramp.points.length - 1) apply(ramp.points.filter((_, j) => j !== i), false); }}>
+                <title>{`${String(p.s).replace('.', ',')}× — arrasta; duplo clique apaga`}</title>
+              </circle>
+            ))}
+          </svg>
+          <p className="hint">Duração: {(clip.duration / fps).toFixed(1).replace('.', ',')} s. Arrasta os pontos (para cima = mais rápido); duplo clique na curva cria um ponto, num ponto apaga-o. {ramp.points.some((p) => p.s < 0.25 || p.s > 4) ? 'Nas partes muito lentas ou muito rápidas o som fica mudo.' : ''}</p>
+          <button className="btn small" onClick={() => commit((p) => setSpeedRamp(p, clip.id, null))}>Tirar curva</button>
+        </>
+      ) : <p className="hint">Escolhe uma curva: a velocidade muda ao longo do clip (abranda no momento importante e acelera o resto).</p>}
+    </div>
   );
 };
 
@@ -749,6 +844,67 @@ export const StickerSection: React.FC<{ clip: Clip }> = ({ clip }) => {
         ))}
       </div>
       <p className="hint">Muda o tamanho e a posição com o rato no ecrã. As animações de entrada/saída estão no separador Animação.</p>
+    </section>
+  );
+};
+
+// ---------- ferramentas de som: silêncios, ruído, ducking ----------
+
+export const AudioToolsSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ clip, media }) => {
+  const { state, commit, notify, mediaBase } = useEditor();
+  const ctx = { project: state.project, commit, notify, mediaBase };
+  const [strength, setStrength] = React.useState(0.5);
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const run = async (k: string, fn: () => Promise<void>) => { setBusy(k); try { await fn(); } finally { setBusy(null); } };
+  return (
+    <section className="section audio-tools">
+      <h3 className="section-title">Som</h3>
+      <button className="btn block" onClick={() => openModal({ kind: 'silence', clipId: clip.id })} title="Encontra as pausas na fala e corta-as">
+        <Icon name="silence" size={16} /> Cortar silêncios…
+      </button>
+      <div className="tool-row">
+        <span className="field-label">Reduzir ruído</span>
+        {media.denoisedFrom ? (
+          <div className="btn-row wrap">
+            <span className="badge ok">✓ Sem ruído</span>
+            <button className="btn small" onClick={() => restoreOriginalSound(ctx, clip.id)}>Repor original</button>
+          </div>
+        ) : (
+          <>
+            <div className="chip-row">
+              {([[0.25, 'Suave'], [0.5, 'Normal'], [0.85, 'Forte']] as const).map(([v, l]) => (
+                <button key={l} className={`chip${strength === v ? ' on' : ''}`} onClick={() => setStrength(v)}>{l}</button>
+              ))}
+            </div>
+            <button className="btn block" disabled={!!busy} onClick={() => run('dn', () => denoiseClip(ctx, clip.id, strength))} title="Tira zumbido, vento e ruído de fundo da voz">
+              <Icon name="denoise" size={16} /> {busy === 'dn' ? 'A limpar…' : 'Reduzir ruído'}
+            </button>
+          </>
+        )}
+      </div>
+      <div className="tool-row">
+        <span className="field-label">Baixar quando há voz (ducking)</span>
+        <div className="chip-row">
+          {([[0.5, '−6 dB'], [0.25, '−12 dB'], [0.125, '−18 dB']] as const).map(([v, l]) => (
+            <button key={l} className="chip" disabled={!!busy} onClick={() => run('duck', () => duckMusic(ctx, [clip.id], v))} title={`Usa este clip como música: baixa ${l} quando há voz nos outros clips`}>{l}</button>
+          ))}
+        </div>
+        <p className="hint">Para a música: baixa sozinha quando alguém fala noutro clip e volta a subir nas pausas (cria pontos de volume).</p>
+      </div>
+    </section>
+  );
+};
+
+export const PlaceholderSection: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { state, commit, notify, mediaBase } = useEditor();
+  const ph = clip.placeholder!;
+  return (
+    <section className="section ph-box">
+      <p className="ph-title">▢ {ph.label}</p>
+      <p className="hint">Espaço do modelo: arrasta para aqui {ph.accept === 'image' || ph.field ? 'uma foto' : ph.accept === 'video' ? 'um vídeo' : 'um vídeo ou uma foto'} da biblioteca (para o clip na timeline ou para o ecrã), ou escolhe um ficheiro. Fica com a mesma duração, enquadramento e efeitos.</p>
+      <button className="btn primary block" onClick={() => { void replaceWithFile({ project: state.project, commit, notify, mediaBase }, clip.id); }}>
+        <Icon name="import" size={16} /> Escolher {ph.accept === 'image' || ph.field ? 'foto' : ph.accept === 'video' ? 'vídeo' : 'vídeo ou foto'}…
+      </button>
     </section>
   );
 };

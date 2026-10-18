@@ -9,7 +9,8 @@ import { addLottieClip, addTemplateClip, findClip, setAnimatedProps } from '../o
 import { getLottieEntry } from '../lottie-registry';
 import { getTemplateTheme } from '../template-theme';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
-import { TEMPLATE_DRAG_TYPE } from './MediaBin';
+import { MEDIA_DRAG_TYPE, TEMPLATE_DRAG_TYPE } from './MediaBin';
+import { replaceWithMedia } from '../analysis-ui';
 import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
@@ -64,7 +65,7 @@ function useIdle(active: boolean, ms = 2200) {
 }
 
 export const Preview: React.FC = () => {
-  const { state, mediaBase, commit } = useEditor();
+  const { state, mediaBase, commit, notify } = useEditor();
   const ov = usePreviewOverride();
   const [dropOver, setDropOver] = useState(false);
   const project = ov ? ov.project : state.project;
@@ -152,13 +153,23 @@ export const Preview: React.FC = () => {
           className={`preview-frame${dropOver ? ' drop-over' : ''}`}
           style={{ aspectRatio: `${project.width} / ${project.height}` }}
           onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('.tf-layer, .text-drag')) fs.toggle(); }}
-          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes(STICKER_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes(STICKER_DRAG_TYPE) || e.dataTransfer.types.includes(MEDIA_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
           onDragLeave={() => setDropOver(false)}
           onDrop={(e) => {
             setDropOver(false);
             const lid = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
             const tid = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
             const fxid = e.dataTransfer.getData(EFFECT_DRAG_TYPE);
+            const mid = e.dataTransfer.getData(MEDIA_DRAG_TYPE);
+            if (mid) {
+              // media largada no ecrã: preenche o espaço do modelo que está na agulha (o de cima)
+              e.preventDefault();
+              const at = playhead.frame;
+              const ph = state.project.tracks.filter((t) => t.kind === 'video' && !t.hidden).flatMap((t) => t.clips).find((c) => c.placeholder && at >= c.start && at < c.start + c.duration);
+              if (ph) replaceWithMedia({ project: state.project, commit, notify }, ph.id, mid);
+              else notify('Para pôr na timeline, arrasta para uma pista. No ecrã, só para preencher um espaço de modelo.', 'error');
+              return;
+            }
             const stk = e.dataTransfer.types.includes(STICKER_DRAG_TYPE) ? getDraggedSticker() : null;
             if (stk) {
               e.preventDefault();

@@ -32,7 +32,7 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 **Editar**
 - Timeline com várias pistas de vídeo, áudio e texto; mover, aparar, dividir (`S`, `Q`, `W`), copiar/colar, apagar e fechar espaço
 - Íman, zoom até ao fotograma (também a arrastar na régua), forma de onda real, seleção múltipla, desfazer/refazer
-- Velocidade (0,25× a 4×), fades arrastáveis, separar o áudio, **congelar fotograma**, **dividir nas mudanças de cena**
+- Velocidade (0,25× a 4×) e **curvas de velocidade**, fades arrastáveis, separar o áudio, **congelar fotograma**, **dividir nas mudanças de cena**, **cortar silêncios**, **substituir media**
 - Enquadramento com o rato (mover, redimensionar, rodar), disposições rápidas (ecrã dividido, imagem dentro de imagem), **keyframes** com curvas IBM
 - Mudar o formato a qualquer momento (16:9, 9:16, 1:1, 4:5…) com **fundo desfocado** para encher as barras
 
@@ -40,6 +40,7 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 - **Música e efeitos sonoros** incluídos (10 músicas, 23 efeitos), criados para o VidCut e livres de direitos
 - **Cortes ao ritmo da música**: batidas detetadas, íman nas batidas e "encaixar clips no ritmo"
 - **Normalizar volume** (−14 LUFS, o nível das redes) e **keyframes de volume** desenhados no próprio clip
+- **Reduzir ruído** da voz e **ducking automático** (a música baixa quando alguém fala)
 
 **Texto e legendas**
 - Textos com animações de entrada e saída (máquina de escrever, palavra a palavra…), caixa, sombra, **contorno e brilho**
@@ -47,6 +48,7 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 - **Legendas automáticas** feitas no próprio computador (Whisper), em vários estilos: clássico, karaoke, caixa, palavra a palavra; importar/exportar `.srt`
 
 **Modelos, animações e efeitos**
+- **5 modelos de projeto** prontos (lançamento de app, promoção, tutorial, reel ao ritmo, vlog) — só falta pôr os teus vídeos
 - **39 modelos** editáveis (títulos, oráculos, redes sociais, dispositivos, gráficos, eventos, finais com QR…) com **6 temas** de cor
 - Animações **Lottie** incluídas e as tuas (`.json` / `.lottie`)
 - **20 efeitos** (tremor, VHS, glitch, fugas de luz, bokeh, neve, ondulação…) com intensidade ajustável

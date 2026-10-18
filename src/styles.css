@@ -968,3 +968,51 @@ body.vol-dragging, body.vol-dragging * { cursor: grabbing !important; }
 .media-bin .bin-tabs button { font-size: 11.5px; gap: 4px; padding: 0 3px; }
 .media-bin .bin-tabs button svg { width: 15px; height: 15px; }
 .media-bin .bin-tabs { grid-template-columns: 1.3fr 1fr 1fr; }
+
+/* ---------- espaços de modelo ---------- */
+.clip.kind-placeholder { background: repeating-linear-gradient(135deg, #3a3e48 0 8px, #30333b 8px 16px); box-shadow: inset 0 0 0 1px rgba(242, 179, 61, 0.55); }
+.clip.kind-placeholder.selected { box-shadow: inset 0 0 0 2px var(--amber); }
+.ph-box .ph-title { margin: 0; font-weight: 600; color: var(--amber); }
+
+/* ---------- curva de velocidade ---------- */
+.ramp-box { display: flex; flex-direction: column; gap: 10px; }
+.ramp-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.ramp-preset { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px 5px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--text-dim); font: 11px var(--font); cursor: pointer; }
+.ramp-preset:hover { color: var(--text); border-color: var(--text-faint); }
+.ramp-preset.on { color: var(--text); border-color: var(--amber); background: rgba(242, 179, 61, 0.08); }
+.ramp-line { fill: none; stroke: var(--amber); stroke-width: 2; }
+.ramp-mid { stroke: rgba(255, 255, 255, 0.28); stroke-width: 1; }
+.ramp-grid { stroke: rgba(255, 255, 255, 0.07); stroke-width: 1; }
+.ramp-lbl { fill: var(--text-faint); font: 8px var(--mono); }
+.ramp-edit { width: 100%; height: auto; background: var(--bg); border-radius: 8px; border: 1px solid var(--line); touch-action: none; cursor: crosshair; }
+.ramp-pt { fill: var(--amber); stroke: #17191e; stroke-width: 1.5; cursor: grab; }
+.ramp-pt:hover { r: 7; }
+.ramp-play { stroke: #fff; stroke-width: 1; opacity: 0.6; }
+
+/* ---------- som: ferramentas ---------- */
+.audio-tools { display: flex; flex-direction: column; gap: 10px; }
+.tool-row { display: flex; flex-direction: column; gap: 6px; }
+.badge.ok { color: var(--ok, #6fd39f); background: rgba(111, 211, 159, 0.12); }
+
+/* ---------- cortar silêncios ---------- */
+.modal.silence-modal { width: min(660px, calc(100vw - 40px)); }
+.sil-graph { width: 100%; height: 90px; background: var(--bg); border-radius: 8px; border: 1px solid var(--line); }
+.sil-wave { fill: none; stroke: var(--audio-wave, #7fd1c0); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sil-cut { fill: rgba(232, 71, 62, 0.32); }
+.sil-thr { stroke: var(--amber); stroke-dasharray: 4 3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sil-sum { margin: 0; font-size: 13px; }
+.sil-sum b { color: var(--amber); font-family: var(--mono); }
+
+/* ---------- modelos de projeto ---------- */
+.modal.ptpl-modal { width: min(1080px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
+.ptpl-head { display: flex; justify-content: space-between; align-items: center; }
+.ptpl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.ptpl-card { display: flex; gap: 12px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.ptpl-card:hover { border-color: var(--amber); }
+.ptpl-thumb { flex: none; width: 150px; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: #000; align-self: flex-start; }
+.ptpl-thumb.v { width: 96px; aspect-ratio: 9 / 16; }
+.ptpl-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ptpl-info strong { font-size: 14px; }
+.ptpl-meta { font: 11px var(--mono); color: var(--text-faint); }
+.ptpl-info p { margin: 2px 0 6px; font-size: 12.5px; color: var(--text-dim); }
+.ptpl-info .btn { align-self: flex-start; margin-top: auto; }

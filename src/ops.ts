@@ -1,6 +1,6 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { CaptionStyle, Clip, ClipColor, ClipTransform, KfEasing, KfProp, LottieAsset, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { SpeedRamp, CaptionStyle, Clip, ClipColor, ClipTransform, KfEasing, KfProp, LottieAsset, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
 import { lottieInfo } from '../shared/lottie';
 import { captionText, retimeWords, sliceCaption } from '../shared/captions';
 import { clipSpeed } from '../shared/types';
@@ -11,6 +11,7 @@ import { applyTheme, supportsThemes, templateDefaults } from '../shared/template
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
+import { rampDuration, relForSource, srcAtRel, subRamp, uAtRel } from '../shared/speedramp';
 import { VOL_MAX, scaleVolKeys, shiftVolKeys, sortVol, volumeAt } from '../shared/volume';
 
 export const IMAGE_DEFAULT_SEC = 5;
@@ -190,6 +191,7 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const isImage = !Number.isFinite(src);
   let { start, duration, trimStart } = origin;
   const sp = clipSpeed(origin);
+  if (origin.speedRamp) return trimRamped(p, origin, edge, deltaFrames, others);
 
   if (edge === 'left') {
     const prevEnd = others.filter((c) => c.start + c.duration <= origin.start).reduce((m, c) => Math.max(m, c.start + c.duration), 0);
@@ -258,7 +260,8 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
     for (const c of t.clips) {
       if (set.has(c.id) && frame > c.start && frame < c.start + c.duration) {
         const leftDur = frame - c.start;
-        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur), ...sliceCaption(c, 0, leftDur), ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, 0, leftDur, c) } : {}) };
+        const rp = c.speedRamp ? splitRamp(c, leftDur) : null;
+        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur), ...sliceCaption(c, 0, leftDur), ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, 0, leftDur, c) } : {}), ...(rp ? { speedRamp: rp.left } : {}) };
         const right: Clip = {
           ...c,
           id: uid('c'),
@@ -268,7 +271,8 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
           ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, -leftDur, c.duration - leftDur, c) } : {}),
           start: frame,
           duration: c.duration - leftDur,
-          trimStart: Math.round(c.trimStart + leftDur * clipSpeed(c)),
+          trimStart: rp ? c.trimStart + rp.srcOffset : Math.round(c.trimStart + leftDur * clipSpeed(c)),
+          ...(rp ? { speedRamp: rp.right } : {}),
           fadeIn: 0,
           fadeOut: Math.min(c.fadeOut, c.duration - leftDur),
           ...sliceCaption(c, leftDur, c.duration),
@@ -305,6 +309,7 @@ export function changeFps(p: Project, fps: number): Project {
         ...(c.animOut ? { animOut: { ...c.animOut, duration: Math.max(1, r(c.animOut.duration)) } } : {}),
         ...(c.keyframes ? { keyframes: c.keyframes.map((kf) => ({ ...kf, frame: r(kf.frame) })) } : {}),
         ...(c.volKeys ? { volKeys: c.volKeys.map((v) => ({ ...v, f: r(v.f) })) } : {}),
+        ...(c.speedRamp ? { speedRamp: { ...c.speedRamp, src: Math.max(1, r(c.speedRamp.src)) } } : {}),
       })),
     })),
   };
@@ -338,6 +343,7 @@ export function detachAudio(p: Project, clipId: string): { project: Project; cli
     duration: clip.duration,
     trimStart: clip.trimStart,
     speed: clip.speed,
+    speedRamp: clip.speedRamp,
     volume: clip.volume,
     volKeys: clip.volKeys,
     fadeIn: clip.fadeIn,
@@ -370,6 +376,13 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
     tracks: p.tracks.map((t) => {
       const target = t.clips.find((c) => set.has(c.id) && frame > c.start && frame < c.start + c.duration);
       if (!target) return t;
+      if (target.speedRamp) {
+        // com curva: divide e apaga o lado escolhido, fechando o espaço
+        const r = splitClips({ ...p, tracks: [t] }, [target.id], frame);
+        const tt = r.project.tracks[0];
+        const goneId = side === 'left' ? target.id : r.created[0];
+        return rippleDelete({ ...p, tracks: [tt] }, [goneId]).tracks[0];
+      }
       const media = p.media.find((m) => m.id === target.mediaId);
       const isImage = media?.kind === 'image';
       const end0 = target.start + target.duration;
@@ -505,9 +518,9 @@ export const SPEED_MAX = 4;
 export function setSpeed(p: Project, clipId: string, speed: number): Project {
   const f = findClip(p, clipId);
   if (!f) return p;
-  const old = clipSpeed(f.clip);
+  const old = f.clip.speedRamp ? f.clip.speedRamp.src / f.clip.duration : clipSpeed(f.clip);
   const sp = Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(speed * 100) / 100));
-  if (sp === old) return p;
+  if (sp === old && !f.clip.speedRamp) return p;
   const duration = Math.max(1, Math.round((f.clip.duration * old) / sp));
   const delta = duration - f.clip.duration;
   const end0 = f.clip.start + f.clip.duration;
@@ -519,7 +532,7 @@ export function setSpeed(p: Project, clipId: string, speed: number): Project {
         ...t,
         clips: t.clips.map((c) => {
           if (c.id === clipId) {
-            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration), keyframes: scaleKeyframes(c.keyframes, old / sp), ...(c.volKeys ? { volKeys: scaleVolKeys(c.volKeys, old / sp) } : {}) };
+            return { ...c, speedRamp: undefined, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration), keyframes: scaleKeyframes(c.keyframes, old / sp), ...(c.volKeys ? { volKeys: scaleVolKeys(c.volKeys, old / sp) } : {}) };
           }
           return c.start >= end0 ? { ...c, start: Math.max(0, c.start + delta) } : c;
         }),
@@ -831,6 +844,7 @@ export function sourceTimeAt(p: Project, clipId: string, frame: number): number 
   const f = findClip(p, clipId);
   if (!f) return null;
   const rel = Math.min(f.clip.duration - 1, Math.max(0, frame - f.clip.start));
+  if (f.clip.speedRamp) return (f.clip.trimStart + srcAtRel(f.clip.speedRamp, f.clip.duration, rel)) / p.fps;
   return (f.clip.trimStart + rel * clipSpeed(f.clip)) / p.fps;
 }
 
@@ -1080,11 +1094,10 @@ export function setMediaBeats(p: Project, mediaId: string, bpm: number, beats: n
 export function clipBeatFrames(p: Project, clip: Clip): number[] {
   const m = p.media.find((x) => x.id === clip.mediaId);
   if (!m?.beats?.length) return [];
-  const sp = clipSpeed(clip);
   const out: number[] = [];
   for (const b of m.beats) {
-    const f = Math.round(clip.start + (b * p.fps - clip.trimStart) / sp);
-    if (f >= clip.start && f <= clip.start + clip.duration) out.push(f);
+    const rel = relForSource(clip, b * p.fps);
+    if (rel !== null) out.push(Math.round(clip.start + rel));
   }
   return out;
 }
@@ -1184,9 +1197,173 @@ export function splitAtFrames(p: Project, clipIds: string[], frames: number[]): 
 
 /** Frames da timeline onde um clip mostra os tempos da fonte indicados (segundos) — para cortes de cena */
 export function sourceTimesToFrames(p: Project, clip: Clip, times: number[]): number[] {
-  const sp = clipSpeed(clip);
   const minGap = Math.max(2, Math.round(p.fps * 0.25));
   return times
-    .map((t) => Math.round(clip.start + (t * p.fps - clip.trimStart) / sp))
+    .map((t) => { const r = relForSource(clip, t * p.fps); return r === null ? -1 : Math.round(clip.start + r); })
     .filter((f) => f > clip.start + minGap && f < clip.start + clip.duration - minGap);
+}
+
+// ---------- curvas de velocidade ----------
+/** Divide a curva de um clip no frame relativo `leftDur` */
+function splitRamp(c: Clip, leftDur: number): { left: SpeedRamp; right: SpeedRamp; srcOffset: number } {
+  const r = c.speedRamp!;
+  const u = uAtRel(r, c.duration, leftDur);
+  return { left: subRamp(r, 0, u), right: subRamp(r, u, 1), srcOffset: Math.round(u * r.src) };
+}
+
+/** Aparar um clip com curva: só encurta (a curva é recortada) */
+function trimRamped(p: Project, origin: Clip, edge: 'left' | 'right', delta: number, others: Clip[]): Project {
+  const r = origin.speedRamp!;
+  if (edge === 'left') {
+    const prevEnd = others.filter((c) => c.start + c.duration <= origin.start).reduce((m, c) => Math.max(m, c.start + c.duration), 0);
+    const d = Math.min(origin.duration - 1, Math.max(0, Math.round(delta), prevEnd - origin.start));
+    if (d <= 0) return updateClip(p, origin.id, { start: origin.start, duration: origin.duration, trimStart: origin.trimStart, speedRamp: r });
+    const u = uAtRel(r, origin.duration, d);
+    const duration = origin.duration - d;
+    return updateClip(p, origin.id, {
+      start: origin.start + d, duration, trimStart: origin.trimStart + Math.round(u * r.src), speedRamp: subRamp(r, u, 1),
+      fadeIn: Math.min(origin.fadeIn, duration), fadeOut: Math.min(origin.fadeOut, duration),
+      keyframes: shiftKeyframes(origin.keyframes, -d),
+      ...(origin.volKeys ? { volKeys: shiftVolKeys(origin.volKeys, -d, duration, origin) } : {}),
+    });
+  }
+  const duration = Math.max(1, Math.min(origin.duration, origin.duration + Math.round(delta)));
+  if (duration === origin.duration) return updateClip(p, origin.id, { duration, speedRamp: r });
+  const u = uAtRel(r, origin.duration, duration);
+  return updateClip(p, origin.id, {
+    duration, speedRamp: subRamp(r, 0, u),
+    fadeIn: Math.min(origin.fadeIn, duration), fadeOut: Math.min(origin.fadeOut, duration),
+    ...(origin.volKeys ? { volKeys: shiftVolKeys(origin.volKeys, 0, duration, origin) } : {}),
+  });
+}
+
+/**
+ * Põe (ou tira, com null) uma curva de velocidade. Mantém o mesmo excerto da fonte; o clip estica/encolhe
+ * e os clips seguintes da pista acompanham.
+ */
+export function setSpeedRamp(p: Project, clipId: string, ramp: SpeedRamp | null): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  const src = c.speedRamp ? c.speedRamp.src : Math.round(c.duration * clipSpeed(c));
+  const next = ramp ? { ...ramp, src } : null;
+  const duration = next ? rampDuration(next) : Math.max(1, src);
+  const delta = duration - c.duration;
+  const end0 = c.start + c.duration;
+  const k = duration / c.duration;
+  return {
+    ...p,
+    tracks: p.tracks.map((t) => (t.id !== f.track.id ? t : {
+      ...t,
+      clips: t.clips.map((x) => {
+        if (x.id === clipId) {
+          return {
+            ...x, speed: undefined, speedRamp: next ?? undefined, duration,
+            fadeIn: Math.min(x.fadeIn, duration), fadeOut: Math.min(x.fadeOut, duration),
+            keyframes: scaleKeyframes(x.keyframes, k), ...(x.volKeys ? { volKeys: scaleVolKeys(x.volKeys, k) } : {}),
+          };
+        }
+        return x.start >= end0 ? { ...x, start: Math.max(0, x.start + delta) } : x;
+      }),
+    })),
+  };
+}
+
+// ---------- cortar silêncios ----------
+/**
+ * Corta intervalos (frames da timeline) de um clip e fecha o espaço na pista (ripple).
+ * Se o clip tiver o som separado, corta o mesmo no clip de áudio. Devolve quantos frames saíram.
+ */
+export function removeRanges(p: Project, clipId: string, ranges: [number, number][]): { project: Project; removed: number; select: string[] } {
+  const f = findClip(p, clipId);
+  if (!f || !ranges.length) return { project: p, removed: 0, select: [] };
+  const c = f.clip;
+  const end = c.start + c.duration;
+  const rs = ranges.map(([a, b]) => [Math.max(c.start, Math.round(a)), Math.min(end, Math.round(b))] as [number, number]).filter(([a, b]) => b - a >= 1);
+  if (!rs.length) return { project: p, removed: 0, select: [] };
+  const pair = c.detachedAudioId && findClip(p, c.detachedAudioId)?.clip;
+  const ids = [c.id, ...(pair && pair.start === c.start && pair.duration === c.duration ? [pair.id] : [])];
+  const cuts = [...new Set(rs.flat())].filter((x) => x > c.start && x < end);
+  const sp = splitAtFrames(p, ids, cuts);
+  const pieces = [...ids, ...sp.created].map((id) => findClip(sp.project, id)?.clip).filter((x): x is Clip => !!x);
+  const gone = pieces.filter((x) => rs.some(([a, b]) => x.start >= a && x.start + x.duration <= b)).map((x) => x.id);
+  const project = rippleDelete(sp.project, gone);
+  const keep = pieces.filter((x) => !gone.includes(x.id) && findClip(project, x.id)?.track.id === f.track.id).map((x) => x.id);
+  return { project, removed: rs.reduce((s, [a, b]) => s + b - a, 0), select: keep };
+}
+
+// ---------- ducking ----------
+/**
+ * Baixa o volume de um clip (música) nos intervalos com voz (frames da timeline): cria keyframes de volume.
+ * depth = volume durante a voz em relação ao normal (0,25 ≈ −12 dB). attack/release em frames.
+ */
+export function duckClip(p: Project, clipId: string, voice: [number, number][], depth: number, attack: number, release: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  const base = c.volKeys?.length ? Math.max(...c.volKeys.map((k) => k.v)) : c.volume;
+  const low = Math.round(base * depth * 1000) / 1000;
+  // intervalos relativos ao clip, alargados pela descida/subida e juntos quando se tocam
+  const rel = voice
+    .map(([a, b]) => [a - c.start, b - c.start] as [number, number])
+    .filter(([a, b]) => b > 0 && a < c.duration)
+    .sort((x, y) => x[0] - y[0]);
+  const merged: [number, number][] = [];
+  for (const [a, b] of rel) {
+    const last = merged[merged.length - 1];
+    if (last && a - attack <= last[1] + release) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
+  }
+  if (!merged.length) return updateClip(p, clipId, { volKeys: undefined, volume: base });
+  const keys: { f: number; v: number }[] = [];
+  const push = (fr: number, v: number) => {
+    const x = Math.min(c.duration, Math.max(0, Math.round(fr)));
+    const last = keys[keys.length - 1];
+    if (last && x <= last.f) { if (x === last.f) last.v = v; return; }
+    keys.push({ f: x, v });
+  };
+  push(0, merged[0][0] - attack <= 0 ? low : base);
+  for (const [a, b] of merged) {
+    if (a - attack > 0) push(a - attack, base);
+    push(Math.max(0, a), low);
+    push(Math.min(c.duration, b), low);
+    if (b + release < c.duration) push(b + release, base);
+  }
+  push(c.duration, keys[keys.length - 1].v);
+  return updateClip(p, clipId, { volKeys: keys });
+}
+
+// ---------- substituir media / preencher espaços ----------
+export function canReplaceWith(p: Project, clipId: string, mediaId: string): string | null {
+  const f = findClip(p, clipId);
+  const m = p.media.find((x) => x.id === mediaId);
+  if (!f || !m) return 'Clip ou ficheiro não encontrado.';
+  const ph = f.clip.placeholder;
+  if (ph?.field) return m.kind === 'image' ? null : 'Este espaço precisa de uma imagem.';
+  if (ph && ph.accept !== 'any' && ph.accept !== m.kind) return `Este espaço precisa de ${ph.accept === 'image' ? 'uma foto' : 'um vídeo'}.`;
+  if (f.track.kind === 'audio') return m.kind === 'image' ? 'Numa pista de áudio só entra som.' : null;
+  if (f.clip.text || f.clip.sticker || f.clip.lottie || (f.clip.template && !ph)) return 'Este clip não tem media para substituir.';
+  return m.kind === 'audio' ? 'Numa pista de vídeo só entram vídeos e imagens.' : null;
+}
+
+/**
+ * Troca o ficheiro de um clip (ou preenche um espaço de modelo) mantendo posição, duração, enquadramento,
+ * efeitos, cor e transições. Um vídeo mais curto que o clip encurta-o.
+ */
+export function replaceMedia(p: Project, clipId: string, mediaId: string): Project {
+  if (canReplaceWith(p, clipId, mediaId)) return p;
+  const f = findClip(p, clipId)!;
+  const m = p.media.find((x) => x.id === mediaId)!;
+  const c = f.clip;
+  if (c.placeholder?.field && c.template) {
+    return updateClip(p, clipId, { placeholder: undefined, template: { ...c.template, props: { ...c.template.props, [c.placeholder.field]: mediaId } } });
+  }
+  const src = sourceFrames(m, p.fps);
+  const sp = clipSpeed(c);
+  const duration = Number.isFinite(src) ? Math.max(1, Math.min(c.duration, Math.floor(src / sp))) : c.duration;
+  return updateClip(p, clipId, {
+    mediaId, placeholder: undefined, template: undefined, trimStart: 0, duration, speedRamp: undefined,
+    audioDetached: undefined, detachedAudioId: undefined,
+    fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration),
+  });
 }

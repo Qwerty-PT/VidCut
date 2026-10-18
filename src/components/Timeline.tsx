@@ -21,13 +21,16 @@ import { NarrationButton, NarrationPanel } from './Narration';
 import { usePeaks, wavePath } from '../peaks';
 import { addVolKey, allBeatFrames, clipBeatFrames, hasSound, moveVolKey, removeVolKey, addStickerClip } from '../ops';
 import { volumeAt } from '../../shared/volume';
-import { detectBeats, normalizeClips, splitOnBeats, splitScenes, syncToBeats } from '../analysis-ui';
+import { detectBeats, normalizeClips, splitOnBeats, splitScenes, syncToBeats, denoiseClip, duckMusic, replaceWithFile, replaceWithMedia, restoreOriginalSound } from '../analysis-ui';
+import { openModal } from '../modals';
 import { STICKER_DRAG_TYPE, getDraggedSticker } from './StickerLibrary';
 import { SOUND_DRAG_TYPE, getDraggedSound, addLibrarySound } from './SoundLibrary';
 import type { Action } from '../state';
 import { clipSpeed } from '../../shared/types';
 
 const HEADER_W = 156;
+/** A linha de volume está a ser arrastada: o clip não se mexe */
+let volDrag = false;
 const RULER_H = 30;
 const TRACK_H: Record<Track['kind'], number> = { video: 66, audio: 50, text: 40 };
 const SNAP_PX = 8;
@@ -279,7 +282,7 @@ export const Timeline: React.FC = () => {
 
     const move = (ev: PointerEvent) => {
       const g = gesture.current;
-      if (!g) return;
+      if (!g || volDrag) return;
       if (!g.started) {
         if (Math.abs(ev.clientX - g.x0) < 2 && g.mode !== 'move') return;
         if (Math.abs(ev.clientX - g.x0) < 3 && trackAtClientY(ev.clientY, g.kind) === g.originTrackId) return;
@@ -522,6 +525,10 @@ export const Timeline: React.FC = () => {
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
       });
     } else if (mediaId) {
+      // largado em cima de um espaço de modelo: preenche-o
+      const tr = project.tracks.find((t) => t.id === trackId);
+      const under = tr?.clips.find((c) => start >= c.start && start < c.start + c.duration);
+      if (under?.placeholder) { replaceWithMedia({ project, commit, notify }, under.id, mediaId); return; }
       commit((p) => {
         const r = addClip(p, mediaId, { trackId, start, newTrack, magnet: snap });
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
@@ -684,6 +691,15 @@ export const Timeline: React.FC = () => {
                   {visual && <button role="menuitem" onPointerDown={close(() => splitOnBeats(ctx, sel, 1))}><Icon name="split" size={15} /> Cortar nas batidas</button>}
                 </>
               )}
+              {sound && (
+                <>
+                  <button role="menuitem" onPointerDown={close(() => openModal({ kind: 'silence', clipId: clip.id }))}><Icon name="silence" size={15} /> Cortar silêncios…</button>
+                  {m?.denoisedFrom
+                    ? <button role="menuitem" onPointerDown={close(() => restoreOriginalSound(ctx, clip.id))}><Icon name="denoise" size={15} /> Repor som original (com ruído)</button>
+                    : <button role="menuitem" onPointerDown={close(() => { void denoiseClip({ ...ctx, mediaBase }, clip.id, 0.5); })}><Icon name="denoise" size={15} /> Reduzir ruído</button>}
+                  <button role="menuitem" onPointerDown={close(() => { void duckMusic(ctx, sel, 0.25); })} title="Usa este clip como música e baixa-o quando há voz nos outros"><Icon name="duck" size={15} /> Baixar quando há voz (ducking)</button>
+                </>
+              )}
               {m?.kind === 'video' && visual && (
                 <button role="menuitem" onPointerDown={close(() => { void splitScenes(ctx, clip.id); })}>
                   <Icon name="scenes" size={15} /> Dividir nas mudanças de cena
@@ -727,6 +743,11 @@ export const Timeline: React.FC = () => {
               </button>
             )}
             {menuExtras(f.clip)}
+            {(f.clip.placeholder || (project.media.some((x) => x.id === f.clip.mediaId))) && (
+              <button role="menuitem" onPointerDown={close(() => { void replaceWithFile({ ...ctx, mediaBase }, menu.clipId); })}>
+                <Icon name="replace" size={15} /> {f.clip.placeholder ? 'Escolher vídeo ou foto…' : 'Substituir media…'}
+              </button>
+            )}
             <div className="ctx-sep" />
             <button role="menuitem" onPointerDown={run(() => commit((p) => rippleDelete(p, selection.includes(menu.clipId) ? selection : [menu.clipId]), []))}>
               <Icon name="trash" size={15} /> Apagar e fechar espaço <kbd>⇧Del</kbd>
@@ -893,12 +914,12 @@ const ClipView: React.FC<{
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
-  const kind = clip.text ? 'text' : clip.template ? 'template' : clip.lottie ? 'lottie' : clip.sticker ? 'sticker' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
+  const kind = clip.placeholder ? 'placeholder' : clip.text ? 'text' : clip.template ? 'template' : clip.lottie ? 'lottie' : clip.sticker ? 'sticker' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
     <div
-      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template || clip.sticker || (clip.lottie && lottieName) ? '' : ' missing'}`}
+      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.placeholder || clip.text || clip.template || clip.sticker || (clip.lottie && lottieName) ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       data-clip-id={clip.id}
       onPointerDown={(e) => onDown(e, 'move')}
@@ -912,11 +933,12 @@ const ClipView: React.FC<{
           {fo > 0 && <polygon points={`${w},0 ${w - fo},0 ${w},100`} />}
         </svg>
       )}
-      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : clip.sticker ? `☺ ${clip.sticker.name}` : media?.name ?? 'Ficheiro em falta'}</span>}
+      {w > 36 && <span className="clip-name">{clip.placeholder ? `▢ ${clip.placeholder.label}` : clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : clip.sticker ? `☺ ${clip.sticker.name}` : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {sound && (clip.volume !== 1 || clip.volKeys?.length) && w > 80 && <span className="clip-badge">{clip.volKeys?.length ? '◆ vol' : `${Math.round(clip.volume * 100)}%`}</span>}
       {clip.effects?.length && w > 70 ? <span className="clip-badge fx" title={clip.effects.map((x) => getEffect(x.id)?.name ?? x.id).join(', ')}>fx{clip.effects.length > 1 ? ` ${clip.effects.length}` : ''}</span> : null}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}
+      {clip.speedRamp && w > 50 && <span className="clip-badge speed" title="Curva de velocidade">⤳ curva</span>}
       {clip.keyframes?.map((kf) => (
         <div
           key={kf.id}
@@ -931,7 +953,7 @@ const ClipView: React.FC<{
           {beats.map((f, i) => { const x = (f - clip.start) * z; return x > 1 && x < w - 1 ? <line key={i} x1={x} x2={x} y1="0" y2="100%" /> : null; })}
         </svg>
       )}
-      {sound && (selected || !!clip.volKeys?.length) && w > 24 && <VolumeEnvelope clip={clip} w={w} h={height - 2} z={z} active={selected} dispatch={dispatch} />}
+      {sound && (selected || !!clip.volKeys?.length) && w > 24 && <VolumeEnvelope clip={clip} w={w} h={height - 2} z={z} active={selected} dispatch={dispatch} onClipDown={(e) => onDown(e, 'move')} />}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
       {w > 40 && !clip.text && (
@@ -959,7 +981,7 @@ ClipView.displayName = 'ClipView';
 const ClipWave: React.FC<{ clip: Clip; path?: string; fps: number; width: number; full: boolean }> = ({ clip, path, fps, width, full }) => {
   const peaks = usePeaks(path);
   const from = clip.trimStart / fps;
-  const to = (clip.trimStart + clip.duration * clipSpeed(clip)) / fps;
+  const to = (clip.trimStart + (clip.speedRamp ? clip.speedRamp.src : clip.duration * clipSpeed(clip))) / fps;
   const maxPts = Math.max(8, Math.min(1500, Math.ceil(width / 2)));
   const wave = useMemo(() => (peaks && peaks.length ? wavePath(peaks, from, to, maxPts, full) : null), [peaks, from, to, maxPts, full]);
   if (!wave) return full ? <div className="clip-wave" /> : null;
@@ -972,7 +994,7 @@ const ClipWave: React.FC<{ clip: Clip; path?: string; fps: number; width: number
 
 /** Linha de volume por cima do clip: arrastar a linha muda o volume; duplo clique cria um keyframe; arrastar/duplo clique num ponto move/apaga */
 const VOL_TOP = 2; // a linha vai de 0 (em baixo) a 200% (em cima); 100% fica a meio
-const VolumeEnvelope: React.FC<{ clip: Clip; w: number; h: number; z: number; active: boolean; dispatch: React.Dispatch<Action> }> = ({ clip, w, h, z, active, dispatch }) => {
+const VolumeEnvelope: React.FC<{ clip: Clip; w: number; h: number; z: number; active: boolean; dispatch: React.Dispatch<Action>; onClipDown: (e: React.PointerEvent) => void }> = ({ clip, w, h, z, active, dispatch, onClipDown }) => {
   const pad = 7;
   const yOf = (v: number) => pad + (1 - Math.min(VOL_TOP, v) / VOL_TOP) * (h - 2 * pad);
   const vOf = (y: number) => clamp((1 - (y - pad) / (h - 2 * pad)) * VOL_TOP, 0, VOL_TOP);
@@ -999,7 +1021,33 @@ const VolumeEnvelope: React.FC<{ clip: Clip; w: number; h: number; z: number; ac
   return (
     <svg className={`clip-vol${active ? ' active' : ''}`} width={w} height={h} aria-label="Volume">
       <path className="clip-vol-hit" d={d}
-        onPointerDown={(e) => { if (!keys.length) drag(e, (_x, y) => dispatch({ type: 'gesture', fn: (p) => updateClip(p, clip.id, { volume: Math.round(vOf(y) * 100) / 100 }) })); else if (active) e.stopPropagation(); }}
+        onPointerDown={(e) => {
+          // o clique continua a ser do clip (selecionar/mover); só um arrasto na vertical mexe no volume
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          onClipDown(e);
+          if (keys.length || !active) return;
+          const svgEl = (e.currentTarget as Element).closest('svg')!;
+          const x0 = e.clientX, y0 = e.clientY;
+          let mode: 'wait' | 'vol' | 'no' = 'wait';
+          const move = (ev: PointerEvent) => {
+            if (mode === 'wait') {
+              const dx = Math.abs(ev.clientX - x0), dy = Math.abs(ev.clientY - y0);
+              if (dx < 3 && dy < 3) return;
+              if (dy > dx) { mode = 'vol'; volDrag = true; dispatch({ type: 'beginGesture' }); document.body.classList.add('vol-dragging'); }
+              else { mode = 'no'; return; }
+            }
+            if (mode !== 'vol') return;
+            const y = local(ev, svgEl).y;
+            dispatch({ type: 'gesture', fn: (p) => updateClip(p, clip.id, { volume: Math.round(vOf(y) * 100) / 100 }) });
+          };
+          const up = () => {
+            window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+            if (mode === 'vol') { dispatch({ type: 'endGesture' }); document.body.classList.remove('vol-dragging'); }
+            setTimeout(() => { volDrag = false; }, 0);
+          };
+          window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+        }}
         onDoubleClick={(e) => { e.stopPropagation(); const p = local(e, e.currentTarget); dispatch({ type: 'gesture', fn: (q) => addVolKey(q, clip.id, p.x / z, Math.round(vOf(p.y) * 100) / 100) }); }}
       >
         <title>{keys.length ? 'Duplo clique: novo ponto de volume' : `Volume ${label(clip.volume)} — arrasta para cima/baixo · duplo clique cria um ponto (keyframe)`}</title>

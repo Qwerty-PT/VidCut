@@ -17,6 +17,8 @@ import { fontFaceCss, userFontFamily, type FontAsset } from './userfonts';
 import { combineEffects } from './effects';
 import { volumeAt } from './volume';
 import { StickerArt, stickerMedia } from './stickers';
+import { rampSegments } from './speedramp';
+import { PlaceholderBox } from './placeholder';
 
 /** Fontes próprias do projeto: injeta o @font-face e espera que carreguem antes de desenhar */
 const ProjectFonts: React.FC<{ fonts?: Record<string, FontAsset> }> = ({ fonts }) => {
@@ -149,7 +151,7 @@ const VisualClip: React.FC<{
   const sp = clipSpeed(clip);
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
   // caixa posicionada/transformada com filtros de cor; a media enche a caixa
-  const box = clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : clip.sticker ? stickerMedia(clip.sticker) : media, W, H, tf.fit);
+  const box = clip.template || (clip.placeholder && !media) ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : clip.sticker ? stickerMedia(clip.sticker) : media, W, H, tf.fit);
   const fx = combineEffects(clip.effects, { clipId: clip.id, t: clampFrame(from + local - clip.start, clip.duration), fps, dur: clip.duration, w: box.w, h: box.h, k: H / 1080 });
   const frameBox = (children: React.ReactNode) => {
     const ms = mediaStyle(tf, box);
@@ -189,6 +191,10 @@ const VisualClip: React.FC<{
     );
   }
 
+  if (clip.placeholder && !media) {
+    return <Layer look={look} id={clip.id}>{frameBox(<PlaceholderBox label={clip.placeholder.label} accept={clip.placeholder.accept} w={box.w} h={box.h} />)}</Layer>;
+  }
+
   if (clip.sticker) {
     return (
       <Layer look={look} id={clip.id}>
@@ -222,6 +228,42 @@ const VisualClip: React.FC<{
       <Layer look={look} id={clip.id}>
         {blurPx > 0 && <AbsoluteFill style={{ overflow: 'hidden' }}><Img src={src} style={bgStyle} /></AbsoluteFill>}
         {frameBox(<Img src={src} style={fill} />)}
+      </Layer>
+    );
+  }
+
+  if (clip.speedRamp) {
+    // curva de velocidade: troços de velocidade constante, cada um com o seu leitor (pré-carregado)
+    const segs = rampSegments(clip.speedRamp, clip.duration);
+    const lastSrc = Math.max(0, Math.floor(clip.trimStart + clip.speedRamp.src) - 1);
+    const pieces = (style: React.CSSProperties, withSound: boolean) => (<>
+      {pre > 0 && (
+        <Sequence from={0} durationInFrames={pre} layout="none">
+          <Freeze frame={0}><OffthreadVideo src={src} trimBefore={clip.trimStart > 0 ? clip.trimStart : undefined} muted style={style} /></Freeze>
+        </Sequence>
+      )}
+      {segs.map((g) => {
+        const tb = Math.round(clip.trimStart + g.srcStart);
+        return (
+          <Sequence key={g.from} from={pre + g.from} durationInFrames={g.dur} premountFor={Math.round(fps * 0.5)}>
+            <OffthreadVideo
+              src={src} trimBefore={tb > 0 ? tb : undefined} playbackRate={g.rate} style={style}
+              muted={!withSound || silent || g.rate < 0.25 || g.rate > 4}
+              volume={withSound ? (f) => (silent ? 0 : volumeAt(clip, g.from + f) * clipLook(clip, act, from + pre + g.from + f, H).volume) : undefined}
+            />
+          </Sequence>
+        );
+      })}
+      {post > 0 && (
+        <Sequence from={pre + clip.duration} durationInFrames={post} layout="none">
+          <Freeze frame={0}><OffthreadVideo src={src} trimBefore={lastSrc > 0 ? lastSrc : undefined} muted style={style} /></Freeze>
+        </Sequence>
+      )}
+    </>);
+    return (
+      <Layer look={look} id={clip.id}>
+        {blurPx > 0 && <AbsoluteFill style={{ overflow: 'hidden' }}>{pieces(bgStyle, false)}</AbsoluteFill>}
+        {frameBox(pieces(fill, true))}
       </Layer>
     );
   }
@@ -277,6 +319,22 @@ const VisualClip: React.FC<{
 
 const AudioClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: string }> = ({ clip, media, track, base }) => {
   if (track.muted) return null;
+  if (clip.speedRamp) {
+    return (
+      <>
+        {rampSegments(clip.speedRamp, clip.duration).map((g) => {
+          const tb = Math.round(clip.trimStart + g.srcStart);
+          if (g.rate < 0.25 || g.rate > 4) return null; // muito lento/rápido: sem som (como no CapCut)
+          return (
+            <Sequence key={g.from} from={g.from} durationInFrames={g.dur} layout="none">
+              <Audio src={mediaUrl(base, media.path)} trimBefore={tb > 0 ? tb : undefined} playbackRate={g.rate}
+                volume={(f) => volumeAt(clip, g.from + f) * fadeFactor(g.from + f, clip.duration, clip.fadeIn, clip.fadeOut)} />
+            </Sequence>
+          );
+        })}
+      </>
+    );
+  }
   return (
     <Audio
       src={mediaUrl(base, media.path)}
@@ -300,7 +358,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
           if (clip.duration <= 0) return null;
-          if (!media && !((clip.text || clip.template || clip.lottie || clip.sticker) && track.kind !== 'audio')) return null;
+          if (!media && !((clip.text || clip.template || clip.lottie || clip.sticker || clip.placeholder) && track.kind !== 'audio')) return null;
           if (track.kind === 'audio' && media) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
@@ -309,7 +367,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
             );
           }
           if (track.hidden) return null;
-          if (clip.text || (!media && !clip.template && !clip.lottie && !clip.sticker)) {
+          if (clip.text || (!media && !clip.template && !clip.lottie && !clip.sticker && !clip.placeholder)) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name="Texto">
                 {clip.text && <TextLayer clip={clip} text={clip.text} />}

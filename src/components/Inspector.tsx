@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
+import { hasSound, TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { openCaptions } from '../captions-ui';
 import { openProjectSettings } from '../project-settings-ui';
@@ -8,7 +8,7 @@ import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
-import { MultiAudioActions, RhythmSection, ScenesButton, StickerSection, VolumeSection, CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { AudioToolsSection, PlaceholderSection, MultiAudioActions, RhythmSection, ScenesButton, StickerSection, VolumeSection, CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import { stickerMedia } from '../../shared/stickers';
@@ -176,7 +176,7 @@ export const Inspector: React.FC = () => {
   return (
     <aside className="panel inspector">
       <header className="panel-head">
-        <h2 className="ellipsis" title={media?.name}>{clip.sticker ? clip.sticker.name : media?.name ?? 'Clip'}</h2>
+        <h2 className="ellipsis" title={media?.name}>{clip.placeholder ? 'Espaço do modelo' : clip.sticker ? clip.sticker.name : media?.name ?? 'Clip'}</h2>
       </header>
       {hasTabs && (
         <div className="tabs" role="tablist">
@@ -237,6 +237,7 @@ export const Inspector: React.FC = () => {
               </div>
             )}
 
+            {clip.placeholder && <PlaceholderSection clip={clip} />}
             {clip.sticker && <StickerSection clip={clip} />}
             {media && media.kind !== 'image' && !clip.audioDetached && !clip.lottie && <VolumeSection clip={clip} />}
 
@@ -255,6 +256,7 @@ export const Inspector: React.FC = () => {
             </p>
 
             {((media && media.kind !== 'image') || clip.lottie) && <SpeedSection clip={clip} fps={fps} />}
+            {media && hasSound(project, clip.id) && <AudioToolsSection clip={clip} media={media} />}
             {media?.kind === 'video' && isVisual && !clip.template && !clip.lottie && <ScenesButton clip={clip} />}
             {media && (media.kind === 'audio' || (media.kind === 'video' && !isVisual)) && <RhythmSection clip={clip} media={media} />}
           </>

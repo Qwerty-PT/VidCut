@@ -102,6 +102,7 @@ function buildMenu() {
       label: 'Ficheiro',
       submenu: [
         { label: 'Novo projeto', accelerator: 'CmdOrCtrl+N', click: send('new') },
+        { label: 'Novo a partir de modelo…', accelerator: 'CmdOrCtrl+Shift+N', click: send('newFromTemplate') },
         { label: 'Abrir projeto…', accelerator: 'CmdOrCtrl+O', click: send('open') },
         { label: 'Guardar', accelerator: 'CmdOrCtrl+S', click: send('save') },
         { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', click: send('saveAs') },
@@ -389,6 +390,28 @@ ipcMain.handle('video:scenes', async (_e, { file, start, dur, fps, sensitivity }
   if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
   try { return await analysis.detectScenes(file, { start: Math.max(0, Number(start) || 0), dur: Math.max(0, Number(dur) || 0), fps: Math.min(60, Math.max(5, Number(fps) || 30)), sensitivity: Number(sensitivity ?? 0.5) }); }
   catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+
+ipcMain.handle('audio:envelope', async (_e, { file, start, dur }) => {
+  if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
+  try { return await analysis.energyEnvelope(file, Math.max(0, Number(start) || 0), Math.max(0, Number(dur) || 0)); }
+  catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+ipcMain.handle('audio:denoise', async (_e, { file, strength }) => {
+  if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
+  try {
+    const dir = path.join(app.getPath('userData'), 'sem-ruido');
+    await fs.mkdir(dir, { recursive: true });
+    const st = Math.min(1, Math.max(0, Number(strength ?? 0.5)));
+    const base = path.basename(file).replace(/\.[^.]+$/, '').replace(/[^\w\-À-ÿ ]+/g, '_').slice(0, 60);
+    const out = path.join(dir, `${base} (sem ruído ${Math.round(st * 100)}).wav`);
+    if (!(await fs.stat(out).catch(() => null))) {
+      await analysis.denoise(file, out + '.tmp', st, (p) => win?.webContents.send('audio:progress', p));
+      await fs.rename(out + '.tmp', out);
+    }
+    mediaServer.register([out]);
+    return { path: out };
+  } catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
 });
 
 // ---------- Biblioteca de músicas e efeitos sonoros (sons/, incluída na app) ----------

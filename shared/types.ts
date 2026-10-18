@@ -18,6 +18,8 @@ export interface MediaItem {
   /** Batidas detetadas (segundos da fonte) e andamento — para cortar ao ritmo */
   beats?: number[];
   bpm?: number;
+  /** Som limpo pela redução de ruído: caminho do ficheiro original (para repor) */
+  denoisedFrom?: string;
 }
 
 export interface Clip {
@@ -67,6 +69,18 @@ export interface Clip {
   volKeys?: VolKey[];
   /** Sticker ou emoji (mediaId vazio) */
   sticker?: StickerContent;
+  /** Curva de velocidade (substitui `speed`) */
+  speedRamp?: SpeedRamp;
+  /** Espaço de um modelo de projeto: mostra um quadro "põe aqui um vídeo/foto" até receber media */
+  placeholder?: { label: string; accept: 'video' | 'image' | 'any'; field?: string };
+}
+
+export interface RampPoint { u: number; s: number }
+export interface SpeedRamp {
+  preset: string;
+  /** Frames da fonte usados pelo clip */
+  src: number;
+  points: RampPoint[];
 }
 
 export interface VolKey { f: number; v: number }

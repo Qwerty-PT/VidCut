@@ -2,6 +2,16 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.23.0
+
+- Cortar silêncios: encontra as pausas na fala e corta-as, com pré-visualização das pausas e afinação (sensibilidade, pausa mínima, margem)
+- Curvas de velocidade: presets (Montagem, Herói, Bala, Salto…) e editor da curva — abranda no momento importante e acelera o resto
+- Reduzir ruído: tira zumbido, vento e ruído de fundo da voz (Suave, Normal, Forte), com "Repor original"
+- Ducking automático: a música baixa sozinha quando há voz e volta a subir nas pausas
+- Modelos de projeto: Lançamento de app, Promoção, Tutorial, Reel ao ritmo e Vlog de viagem — com música, texto e transições; basta arrastar os teus vídeos e fotos para os espaços
+- Substituir media: troca o ficheiro de um clip mantendo tudo o resto
+- Arrastar a linha de volume já não impede de mover o clip; um som da biblioteca de media entra na agulha numa pista livre
+
 ## 0.22.0
 
 - Música e efeitos sonoros (separador Áudio): 10 músicas e 23 efeitos criados para o VidCut, livres de direitos — ouvir, pesquisar e arrastar para a timeline

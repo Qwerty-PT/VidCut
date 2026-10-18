@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useEditor } from '../editor-context';
 import { api } from '../api';
 import { getThumb, onThumbsChange } from '../media';
-import { addClip, mediaInUse, removeMedia } from '../ops';
+import { addAudioAt, addClip, mediaInUse, removeMedia } from '../ops';
 import { playhead } from '../playhead';
 import { Icon } from './Icon';
 import { LottieLibrary } from './LottieLibrary';
@@ -44,7 +44,8 @@ export const MediaBin: React.FC = () => {
 
   const addAtPlayhead = (m: MediaItem) => {
     commit((p) => {
-      const r = addClip(p, m.id, { start: playhead.frame });
+      // som: na agulha, numa pista de áudio livre (não vai parar ao fim da música)
+      const r = m.kind === 'audio' ? addAudioAt(p, m.id, playhead.frame) : addClip(p, m.id, { start: playhead.frame });
       return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
     });
   };

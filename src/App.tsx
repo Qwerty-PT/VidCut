@@ -26,6 +26,10 @@ import { useCaptionsTarget } from './captions-ui';
 import { pagesToClips, parseSrt, srtToPages, toSrt } from '../shared/captions';
 import { addCaptionTrack } from './ops';
 import { Icon } from './components/Icon';
+import { openModal, useModal } from './modals';
+import { SilenceModal } from './components/SilenceModal';
+import { ProjectTemplatesModal } from './components/ProjectTemplatesModal';
+import { placeholdersLeft } from './project-templates';
 
 type Toast = { id: number; msg: string; kind: 'info' | 'error' };
 
@@ -38,6 +42,7 @@ export const App: React.FC = () => {
   const [exportSetup, setExportSetup] = useState(false);
   const captionsTarget = useCaptionsTarget();
   const projectSettingsOpen = useProjectSettingsOpen();
+  const modal = useModal();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const clipboard = useRef<ClipboardData | null>(null);
@@ -152,6 +157,8 @@ export const App: React.FC = () => {
   const doExport = () => {
     const p = stateRef.current.project;
     if (p.tracks.every((t) => t.clips.length === 0)) return notify('A timeline está vazia.', 'error');
+    const left = placeholdersLeft(p);
+    if (left && !confirm(`Ainda há ${left} ${left === 1 ? 'espaço' : 'espaços'} do modelo por preencher (aparecem às riscas no vídeo). Exportar mesmo assim?`)) return;
     playhead.pause();
     setExportSetup(true);
   };
@@ -222,6 +229,7 @@ export const App: React.FC = () => {
       const typing = isTyping({ target: document.activeElement } as unknown as Event);
       switch (cmd) {
         case 'new': a.doNew(); break;
+        case 'newFromTemplate': openModal({ kind: 'templates' }); break;
         case 'open': a.doOpen(); break;
         case 'save': a.doSave(false); break;
         case 'saveAs': a.doSave(true); break;
@@ -327,6 +335,7 @@ export const App: React.FC = () => {
             <span className="project-meta">{aspectLabel(state.project.width, state.project.height)} · {state.project.width}×{state.project.height} · {state.project.fps} fps</span>
           </button>
           <div className="top-actions">
+            <button className="btn ghost" onClick={() => openModal({ kind: 'templates' })} title="Novo projeto a partir de um modelo (Ctrl+Shift+N)"><Icon name="layers" size={16} /> Modelos</button>
             <button className="btn ghost" onClick={doOpen} title="Abrir projeto (Ctrl+O)"><Icon name="open" size={16} /> Abrir</button>
             <button className="btn ghost" onClick={() => doSave(false)} title="Guardar (Ctrl+S)"><Icon name="save" size={16} /> Guardar</button>
             <button className="btn primary" onClick={doExport} title="Exportar vídeo, GIF ou áudio (Ctrl+E)"><Icon name="export" size={16} /> Exportar</button>
@@ -347,6 +356,8 @@ export const App: React.FC = () => {
         </div>
         {captionsTarget && <CaptionsModal clipId={captionsTarget} />}
         {projectSettingsOpen && <ProjectSettingsModal />}
+        {modal?.kind === 'silence' && <SilenceModal clipId={modal.clipId} />}
+        {modal?.kind === 'templates' && <ProjectTemplatesModal />}
         {exportSetup && (
           <ExportOptionsModal
             project={state.project}

@@ -260,4 +260,103 @@ async function detectScenes(file, { start = 0, dur = 0, fps = 30, sensitivity = 
   return { frames: scores.length, cuts: cuts.map((i) => Math.round((start + i / fps) * 1000) / 1000) };
 }
 
-module.exports = { setFfmpeg, decodePcm, loudness, detectBeats, detectScenes, onsetEnvelope, estimateTempo, trackBeats };
+// ---------------------------------------------------------------------------
+// Envelope de energia (para cortar silêncios e detetar voz): dB por bloco de 20 ms
+// ---------------------------------------------------------------------------
+const ENV_HOP = 0.02;
+async function energyEnvelope(file, start = 0, dur = 0) {
+  const rate = 16000;
+  const x = await decodePcm(file, rate, start, dur);
+  const n = Math.round(rate * ENV_HOP);
+  const frames = Math.floor(x.length / n);
+  const db = new Array(frames);
+  // filtro passa-alto simples (tira roncos de vento/ar condicionado que enganam a deteção de fala)
+  let prevIn = 0, prevOut = 0;
+  for (let f = 0; f < frames; f++) {
+    let acc = 0;
+    for (let i = f * n; i < (f + 1) * n; i++) {
+      const y = 0.97 * (prevOut + x[i] - prevIn); prevIn = x[i]; prevOut = y;
+      acc += y * y;
+    }
+    db[f] = Math.round(Math.max(-100, 10 * Math.log10(acc / n + 1e-12)) * 10) / 10;
+  }
+  return { hop: ENV_HOP, db };
+}
+
+// ---------------------------------------------------------------------------
+// Redução de ruído: "spectral gating" — mede o ruído nas partes mais calmas e tira-o de todo o som
+// ---------------------------------------------------------------------------
+function writeWav(path, samples, rate) {
+  const n = samples.length;
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8);
+  buf.write('fmt ', 12); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(samples[i] * 32767))), 44 + i * 2);
+  return fs.promises.writeFile(path, buf);
+}
+
+/** strength 0..1 (0,5 = normal). Devolve o caminho do WAV limpo (mono 48 kHz, mesma duração) */
+async function denoise(file, outPath, strength = 0.5, onProgress) {
+  const rate = 48000, N = 2048, H = 512, B = N / 2 + 1;
+  const x = await decodePcm(file, rate);
+  if (x.length < N * 4) throw new Error('O som é demasiado curto.');
+  const win = new Float64Array(N);
+  for (let i = 0; i < N; i++) win[i] = Math.sqrt(0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N)); // raiz de Hann (análise e síntese)
+  const frames = Math.floor((x.length - N) / H) + 1;
+  const re = new Float64Array(N), im = new Float64Array(N);
+  // 1) energia por fotograma, para escolher os mais calmos como amostra de ruído
+  const energy = new Float64Array(frames);
+  for (let f = 0; f < frames; f++) { let a = 0; for (let i = 0; i < N; i += 4) a += x[f * H + i] ** 2; energy[f] = a; }
+  const order = Array.from(energy.keys()).sort((a, b) => energy[a] - energy[b]);
+  const quiet = order.slice(0, Math.max(8, Math.floor(frames * 0.1)));
+  const noise = new Float64Array(B);
+  const mags = [];
+  for (const f of quiet) {
+    for (let i = 0; i < N; i++) { re[i] = x[f * H + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    const m = new Float64Array(B);
+    for (let k = 0; k < B; k++) m[k] = Math.hypot(re[k], im[k]);
+    mags.push(m);
+  }
+  for (let k = 0; k < B; k++) { const col = mags.map((m) => m[k]).sort((a, b) => a - b); noise[k] = col[Math.floor(col.length * 0.6)]; }
+  // 2) ganho por bin: tira o ruído, com chão (evita o som "aquático") e suavização no tempo
+  const alpha = 1.0 + 1.5 * strength; // quanto acima do ruído é preciso estar para passar
+  const floor = Math.pow(10, -(8 + 16 * strength) / 20); // −8 dB (suave) a −24 dB (forte)
+  const out = new Float64Array(x.length + N);
+  const norm = new Float64Array(x.length + N);
+  let prevG = new Float64Array(B).fill(1);
+  const g = new Float64Array(B), gs = new Float64Array(B);
+  for (let f = 0; f < frames; f++) {
+    const o = f * H;
+    for (let i = 0; i < N; i++) { re[i] = x[o + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    for (let k = 0; k < B; k++) {
+      const mag = Math.hypot(re[k], im[k]) + 1e-12;
+      const r = (alpha * noise[k]) / mag;
+      g[k] = Math.max(floor, Math.sqrt(Math.max(0, 1 - r * r)));
+    }
+    // suavizar na frequência (3 bins) e no tempo (sobe depressa, desce devagar)
+    for (let k = 0; k < B; k++) {
+      const v = (g[Math.max(0, k - 1)] + 2 * g[k] + g[Math.min(B - 1, k + 1)]) / 4;
+      gs[k] = v > prevG[k] ? v : prevG[k] * 0.6 + v * 0.4;
+    }
+    prevG = Float64Array.from(gs);
+    for (let k = 0; k < B; k++) {
+      re[k] *= gs[k]; im[k] *= gs[k];
+      if (k > 0 && k < N / 2) { re[N - k] = re[k]; im[N - k] = -im[k]; }
+    }
+    // FFT inversa via conjugado
+    for (let i = 0; i < N; i++) im[i] = -im[i];
+    fft(re, im);
+    for (let i = 0; i < N; i++) { out[o + i] += (re[i] / N) * win[i]; norm[o + i] += win[i] * win[i]; }
+    if (onProgress && f % 2000 === 0) onProgress(f / frames);
+  }
+  const y = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) y[i] = norm[i] > 1e-6 ? out[i] / norm[i] : 0;
+  await writeWav(outPath, y, rate);
+  return outPath;
+}
+
+module.exports = { setFfmpeg, decodePcm, loudness, detectBeats, detectScenes, onsetEnvelope, estimateTempo, trackBeats, energyEnvelope, denoise, writeWav };

@@ -72,6 +72,14 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - **Stickers e emojis:** separador **Stickers**: 23 stickers desenhados para o VidCut (balões de fala e pensamento, explosão "NOVO!", etiqueta, carimbo, faixa, setas e círculos desenhados à mão, sublinhado, visto, cruz, raio, brilhos, Subscrever, Gosto, Em direto, Segue-me, cursor, corações, estrelas, exclamação, "Uau!") com texto e cor editáveis, e ~1500 emojis Fluent (Microsoft, licença MIT) com pesquisa em português. Duplo clique, arrastar para a timeline ou largar no ecrã (fica onde o largaste). Animações em loop: Pop, Saltar, Flutuar, Pulsar, Coração, Abanar, Baloiçar, Tremer, Rodar e Desenhar (o traço desenha-se). Comportam-se como imagens: enquadrar com o rato, cor, efeitos, keyframes, animações de entrada/saída
 - **Pré-visualização em ecrã inteiro:** botão no canto da barra por baixo do ecrã, tecla `F` ou duplo clique no ecrã; os controlos escondem-se quando o rato fica parado a reproduzir. `Esc` ou `F` para sair
 
+- **Cortar silêncios:** num clip com fala, "Cortar silêncios…" (painel Som ou botão direito). Mostra a forma do som com as pausas a vermelho e o limiar; afinas sensibilidade, pausa mínima e margem antes/depois da fala e vês logo quantas pausas e quantos segundos saem. Os pedaços encostam-se na mesma pista (se o som estiver separado, é cortado igual); as outras pistas não se mexem
+- **Curvas de velocidade:** em Velocidade → **Curva**: presets Montagem, Herói, Bala, Salto, Entrada rápida, Saída rápida e Abrandar no fim, e editor da curva (0,1× a 10×, escala logarítmica): arrastar pontos, duplo clique cria/apaga. Mantém o mesmo excerto; o clip estica/encolhe e os seguintes acompanham. Dividir e aparar continuam a curva. Nas partes abaixo de 0,25× ou acima de 4× o som fica mudo. Na timeline aparece "⤳ curva". Desenho por troços de velocidade constante (pré-carregados), igual na pré-visualização e no export
+- **Reduzir ruído:** painel Som → Reduzir ruído (Suave, Normal, Forte) ou botão direito. Mede o ruído nas partes mais calmas e tira-o de todo o som ("spectral gating", com chão para não ficar "aquático"); grava um WAV limpo em `sem-ruido/` na pasta de dados e troca o som do clip (num vídeo, o som limpo passa para uma pista de áudio ligada ao vídeo). Todos os pedaços desse som ficam limpos; "Repor original" volta atrás
+- **Ducking automático:** no clip da música, painel Som → "Baixar quando há voz" (−6, −12 ou −18 dB) ou botão direito. Ouve os outros clips com som que tocam ao mesmo tempo, encontra as partes com voz e cria keyframes de volume na música: desce 0,25 s antes, volta a subir 0,5 s depois; pausas curtas ficam em baixo. Os pontos afinam-se na linha de volume
+- **Modelos de projeto:** botão **Modelos** no topo (ou Ficheiro → Novo a partir de modelo…, Cmd+Shift+N): Lançamento de app, Promoção / oferta, Tutorial passo a passo, Reel ao ritmo e Vlog de viagem, com pré-visualização ao passar o rato. Vêm com texto, modelos, stickers, transições e música da biblioteca, com os cortes nas batidas. Os **espaços** (às riscas) recebem os teus vídeos e fotos: arrastar da biblioteca para o espaço na timeline ou para o ecrã, ou botão direito → "Escolher vídeo ou foto…"; ficam com a mesma duração, enquadramento, efeitos e transições. Ao exportar, avisa se ainda há espaços por preencher
+- **Substituir media:** botão direito num clip → "Substituir media…" troca o ficheiro mantendo posição, duração, enquadramento, cor, efeitos e transições (um vídeo mais curto encurta o clip)
+- Duplo clique num som da biblioteca de media põe-no na agulha numa pista de áudio livre (antes ia para o fim da pista)
+
 - **Atualizações automáticas:** na app instalada, procura versões novas nas Releases do GitHub uns segundos depois de abrir (no máximo uma vez por dia) e em **Ajuda → Procurar atualizações** (no Mac também em VidCut → Procurar atualizações). Aviso no canto com as novidades: **Atualizar** descarrega (com progresso e verificação de tamanho/SHA-256), **Reiniciar e instalar** fecha, substitui e volta a abrir; o projeto aberto fica na gravação automática. "Saltar esta versão" deixa de avisar dessa versão
   - macOS: descarrega o `.zip` e substitui a VidCut.app (funciona sem certificado Apple; a app tem de estar numa pasta onde possas escrever, ex.: Aplicações)
   - Windows: corre o instalador em modo silencioso e reabre (a versão portátil abre a página para descarregar)
@@ -182,13 +190,15 @@ electron/
   preload.cjs        ponte segura window.vidcut
   media-server.cjs   servidor HTTP local (127.0.0.1) que serve só os ficheiros importados
   render.cjs         export com @remotion/renderer (corre também fora do Electron)
-  audio-analysis.cjs sonoridade (normalizar), batidas e mudanças de cena com o ffmpeg
+  audio-analysis.cjs sonoridade, batidas, cenas, energia da fala e redução de ruído
 shared/
   types.ts           modelo de dados do projeto
   motion.ts          tokens de animação IBM/Carbon (curvas, durações) + fades
   VidCutComposition.tsx  composição Remotion: a MESMA para pré-visualização e export
   remotion-root.tsx  entrada do bundle de export
   volume.ts          volume ao longo do clip (keyframes de volume)
+  speedramp.ts       curvas de velocidade (tabela tempo↔fonte, troços, presets)
+  speech.ts          fala e silêncio a partir da energia (cortar silêncios, ducking)
   stickers.tsx       stickers desenhados, emojis e as suas animações
 src/                 interface React
   App.tsx            estado global, atalhos, ficheiros, export

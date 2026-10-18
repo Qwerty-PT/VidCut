@@ -76,6 +76,9 @@ export interface VidCutApi {
   loudness(file: string, start: number, dur: number): Promise<{ lufs: number; peakDb: number; error?: string }>;
   beats(file: string): Promise<{ bpm: number; beats: number[]; error?: string }>;
   scenes(o: { file: string; start: number; dur: number; fps: number; sensitivity: number }): Promise<{ cuts: number[]; frames: number; error?: string }>;
+  envelope(file: string, start: number, dur: number): Promise<{ hop: number; db: number[]; error?: string }>;
+  denoise(file: string, strength: number): Promise<{ path?: string; error?: string }>;
+  onAudioProgress(cb: (p: number) => void): () => void;
   soundsList(): Promise<{ musicas: LibSound[]; efeitos: LibSound[] }>;
   soundsUse(file: string): Promise<{ path?: string; error?: string }>;
   updateCheck(): Promise<void>;
