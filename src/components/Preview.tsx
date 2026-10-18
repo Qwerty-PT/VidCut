@@ -7,6 +7,7 @@ import { playhead, useFrame, usePlaying } from '../playhead';
 import { clamp, timecode } from '../util';
 import { addLottieClip, addTemplateClip, findClip, setAnimatedProps } from '../ops';
 import { getLottieEntry } from '../lottie-registry';
+import { getTemplateTheme } from '../template-theme';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
 import { TEMPLATE_DRAG_TYPE } from './MediaBin';
 import { valuesAt } from '../../shared/keyframes';
@@ -114,7 +115,7 @@ export const Preview: React.FC = () => {
               const en = getLottieEntry(lid);
               if (en) commit((p) => { const r = addLottieClip(p, { id: en.id, name: en.name, data: en.data }, at); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; });
             } else {
-              commit((p) => { const r = addTemplateClip(p, tid, at); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; });
+              commit((p) => { const r = addTemplateClip(p, tid, at, { theme: getTemplateTheme() }); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; });
             }
           }}
         >

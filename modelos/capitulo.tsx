@@ -1,4 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 import { FONT_FAMILY } from '../shared/fonts';
 
 // Inspirado em "chapter-title" (reactvideoeditor/remotion-templates, MIT)
@@ -25,7 +25,7 @@ export default defineTemplate({
         <div style={{ width: 10 * k, alignSelf: 'stretch', margin: `${330 * k}px 0`, background: p.destaque, transform: `scaleY(${c})`, transformOrigin: 'top', marginRight: 48 * k }} />
         <div>
           <div style={{ fontFamily: FONT_FAMILY.mono, fontSize: 40 * k, color: p.destaque, opacity: a, transform: `translateY(${(1 - a) * 12 * k}px)` }}>{p.numero}</div>
-          <div style={{ fontFamily: FONT_FAMILY.serif, fontWeight: 600, fontSize: 130 * k, color: p.cor, clipPath: `inset(0 ${(1 - b) * 100}% 0 0)` }}>{p.titulo}</div>
+          <div style={{ fontFamily: fontOf(p, 'serif'), fontWeight: 600, fontSize: 130 * k, color: p.cor, clipPath: `inset(0 ${(1 - b) * 100}% 0 0)` }}>{p.titulo}</div>
         </div>
       </div>
     );

@@ -3,7 +3,8 @@ import { useEditor } from '../editor-context';
 import { applyCaptionLook, updateTemplateProps, DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, addKeyframe, clearKeyframes, removeKeyframe, setAnimatedProps, setKeyframeEasing, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
 import { useFrame, playhead } from '../playhead';
 import { KF_EASINGS, keyframeAt, valuesAt } from '../../shared/keyframes';
-import type { FieldDef, TemplateDef } from '../../shared/template-api';
+import { applyTheme, supportsThemes, type FieldDef, type TemplateDef } from '../../shared/template-api';
+import { THEMES, THEME_KEY } from '../../shared/themes';
 import { Range, Row, Segmented } from './Fields';
 import { Icon } from './Icon';
 import type { AnimPreset, Clip, ClipAnim, ClipColor, MediaItem, TextContent } from '../../shared/types';
@@ -406,6 +407,18 @@ export const TemplateFields: React.FC<{ clip: Clip; def: TemplateDef }> = ({ cli
     <section className="section tpl-fields">
       <h3 className="section-title">{def.name}</h3>
       {def.description && <p className="hint">{def.description}</p>}
+      {supportsThemes(def) && (
+        <div className="field">
+          <span className="field-label">Tema</span>
+          <div className="theme-chips">
+            {THEMES.map((t) => (
+              <button key={t.id} className={`theme-chip${props[THEME_KEY] === t.id ? ' on' : ''}`} onClick={() => commit((p) => updateTemplateProps(p, clip.id, applyTheme(def, props, t.id)))} title={`Aplicar o tema ${t.label} (as cores continuam editáveis)`}>
+                <span className="sw" style={{ background: t.colors.bg }}><i style={{ background: t.colors.accent }} /></span>{t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {def.fields.map((f) => {
         const v = val(f);
         switch (f.type) {

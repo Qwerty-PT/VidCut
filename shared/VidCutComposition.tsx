@@ -5,6 +5,7 @@ import { clipSpeed, mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
 import { Lottie, type LottieAnimationData } from '@remotion/lottie';
 import { lottieMedia } from './lottie';
+import { THEME_KEY, getTheme } from './themes';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 import { animState, blockStyle } from './anim';
 import { TextLayer } from './TextLayer';
@@ -145,12 +146,17 @@ const VisualClip: React.FC<{
     for (const f of def.fields) if (f.type === 'image') props[f.key] = props[f.key] ? resolveMedia(String(props[f.key])) : '';
     for (const f of def.fields) if (props[f.key] === undefined) props[f.key] = f.default;
     const Comp = def.component;
+    const th = getTheme(props[THEME_KEY]);
+    const glowColor = String(props.destaque ?? th?.colors.accent ?? '#ffffff');
+    // brilho néon nas letras (com fundo opaco um filtro no quadro inteiro só brilharia nas margens)
+    const glowCls = th?.glow ? `vc-glow-${clip.id.replace(/[^a-zA-Z0-9_-]/g, '')}` : '';
+    const glowCss = th?.glow ? `.${glowCls} *{text-shadow:0 0 ${4 * (H / 1080)}px ${glowColor},0 0 ${14 * (H / 1080)}px ${glowColor},0 0 ${34 * (H / 1080)}px ${glowColor}88}` : '';
     return (
       <Layer look={look} id={clip.id}>
         {frameBox(
           <Sequence from={pre} durationInFrames={clip.duration + post} layout="none">
             <TemplateDurationContext.Provider value={clip.duration}>
-              <Comp p={props} />
+              {glowCls ? <AbsoluteFill className={glowCls}><style>{glowCss}</style><Comp p={props} /></AbsoluteFill> : <Comp p={props} />}
             </TemplateDurationContext.Provider>
           </Sequence>,
         )}

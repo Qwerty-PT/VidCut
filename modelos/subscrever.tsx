@@ -1,6 +1,5 @@
 import React from 'react';
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "subscribe-reminder" (reactvideoeditor/remotion-templates, MIT) — botão genérico, sem marcas
 export default defineTemplate({
@@ -10,6 +9,7 @@ export default defineTemplate({
   description: 'Botão "Subscrever" com sino, no canto (transparente)',
   durationSec: 4,
   opaque: false,
+  themeRoles: { cor: 'accent' },
   fields: [
     { key: 'texto', label: 'Texto do botão', type: 'text', default: 'Subscrever' },
     { key: 'cor', label: 'Cor do botão', type: 'color', default: '#e5484d' },
@@ -26,7 +26,7 @@ export default defineTemplate({
     return (
       <div style={{ ...fill, opacity: out }}>
         <div style={{ position: 'absolute', ...pos, display: 'flex', alignItems: 'center', gap: 18 * k, opacity: a, transform: `translateY(${(1 - a) * 30 * k}px)` }}>
-          <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: 40 * k, color: '#fff', background: pressed ? '#55595f' : p.cor, padding: `${16 * k}px ${36 * k}px`, borderRadius: 10 * k, transform: `scale(${1 - press * 0.08})`, letterSpacing: '0.01em' }}>
+          <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: 40 * k, color: '#fff', background: pressed ? '#55595f' : p.cor, padding: `${16 * k}px ${36 * k}px`, borderRadius: 10 * k, transform: `scale(${1 - press * 0.08})`, letterSpacing: '0.01em' }}>
             {pressed ? `${p.texto} ✓` : p.texto}
           </div>
           <svg width={58 * k} height={58 * k} viewBox="0 0 24 24" style={{ transform: `rotate(${bell}deg)`, transformOrigin: '50% 10%' }}>

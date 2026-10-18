@@ -1,5 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "end-card" (reactvideoeditor/remotion-templates, MIT)
 export default defineTemplate({
@@ -21,8 +20,8 @@ export default defineTemplate({
     const a = prog(0, 18), b = prog(12, 16);
     return (
       <div style={{ ...fill, background: p.fundo, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 56 * k }}>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: 110 * k, color: p.cor, opacity: a, transform: `translateY(${(1 - a) * 30 * k}px)`, textAlign: 'center' }}>{p.titulo}</div>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 600, fontSize: 48 * k, color: '#1b1300', background: p.destaque, padding: `${18 * k}px ${48 * k}px`, borderRadius: 999, opacity: b, transform: `scale(${0.92 + 0.08 * b})` }}>{p.contacto}</div>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: 110 * k, color: p.cor, opacity: a, transform: `translateY(${(1 - a) * 30 * k}px)`, textAlign: 'center' }}>{p.titulo}</div>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 600, fontSize: 48 * k, color: '#1b1300', background: p.destaque, padding: `${18 * k}px ${48 * k}px`, borderRadius: 999, opacity: b, transform: `scale(${0.92 + 0.08 * b})` }}>{p.contacto}</div>
       </div>
     );
   },

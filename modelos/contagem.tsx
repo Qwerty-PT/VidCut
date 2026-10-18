@@ -1,5 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "countdown-timer" (reactvideoeditor/remotion-templates, MIT) — sem ressalto (IBM)
 export default defineTemplate({
@@ -35,7 +34,7 @@ export default defineTemplate({
             <circle cx="50%" cy="50%" r={R} fill="none" stroke={p.destaque} strokeWidth={6 * k} strokeDasharray={C} strokeDashoffset={C * t} strokeLinecap="round" transform={`rotate(-90 ${(size + 20 * k) / 2} ${(size + 20 * k) / 2})`} />
           )}
         </svg>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: idx < n ? 260 * k : 160 * k, color: idx < n ? p.cor : p.destaque, opacity: appear, transform: `scale(${0.9 + 0.1 * appear})` }}>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: idx < n ? 260 * k : 160 * k, color: idx < n ? p.cor : p.destaque, opacity: appear, transform: `scale(${0.9 + 0.1 * appear})` }}>
           {label}
         </div>
       </div>

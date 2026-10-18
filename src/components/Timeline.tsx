@@ -3,6 +3,7 @@ import { useEditor } from '../editor-context';
 import { addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { getLottieEntry } from '../lottie-registry';
 import { openCaptions } from '../captions-ui';
+import { getTemplateTheme } from '../template-theme';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
@@ -448,7 +449,7 @@ export const Timeline: React.FC = () => {
       });
     } else if (templateId) {
       commit((p) => {
-        const r = addTemplateClip(p, templateId, start, { trackId, newTrack, magnet: snap });
+        const r = addTemplateClip(p, templateId, start, { trackId, newTrack, magnet: snap, theme: getTemplateTheme() });
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
       });
     } else if (mediaId) {

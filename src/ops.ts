@@ -7,7 +7,7 @@ import { clipSpeed } from '../shared/types';
 import { DEFAULT_TRANSFORM, getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
 import { getTemplate } from '../shared/templates';
-import { templateDefaults } from '../shared/template-api';
+import { applyTheme, supportsThemes, templateDefaults } from '../shared/template-api';
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
@@ -612,7 +612,7 @@ export function clearKeyframes(p: Project, clipId: string, rel: number): Project
  * livre a contar de cima; se nenhuma tiver espaço, cria uma nova no topo.
  */
 export function addTemplateClip(
-  p: Project, templateId: string, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean } = {},
+  p: Project, templateId: string, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean; theme?: string } = {},
 ): { project: Project; clipId: string | null } {
   const def = getTemplate(templateId);
   if (!def) return { project: p, clipId: null };
@@ -635,7 +635,7 @@ export function addTemplateClip(
     volume: 1,
     fadeIn: 0,
     fadeOut: 0,
-    template: { id: templateId, props: templateDefaults(def) },
+    template: { id: templateId, props: opts.theme && supportsThemes(def) ? applyTheme(def, templateDefaults(def), opts.theme) : templateDefaults(def) },
   };
   const trackId = track.id;
   project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));

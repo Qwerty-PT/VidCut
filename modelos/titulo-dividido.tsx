@@ -1,6 +1,5 @@
 import React from 'react';
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "title-split" (reactvideoeditor/remotion-templates, MIT) — um eixo de cada vez (IBM)
 export default defineTemplate({
@@ -21,7 +20,7 @@ export default defineTemplate({
     const { k, width, prog, outro } = useTemplate();
     const a = prog(0, 20), b = prog(6, 20);
     const out = outro(10);
-    const style = (c: string): React.CSSProperties => ({ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: p.tamanho * k, color: c, lineHeight: 1, whiteSpace: 'nowrap', textShadow: `0 ${4 * k}px ${20 * k}px rgba(0,0,0,0.45)` });
+    const style = (c: string): React.CSSProperties => ({ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: p.tamanho * k, color: c, lineHeight: 1, whiteSpace: 'nowrap', textShadow: `0 ${4 * k}px ${20 * k}px rgba(0,0,0,0.45)` });
     return (
       <div style={{ ...fill, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 * k, opacity: out, overflow: 'hidden' }}>
         <div style={{ ...style(p.cor1), transform: `translateX(${(1 - a) * -width * 0.6}px)`, opacity: a }}>{p.linha1}</div>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Img } from 'remotion';
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "logo-blur-reveal", "logo-scale-rotate" e "logo-fade-reveal" (reactvideoeditor/remotion-templates, MIT)
 export default defineTemplate({
@@ -35,9 +34,9 @@ export default defineTemplate({
         <div style={{ width: size, height: size, display: 'grid', placeItems: 'center', ...style }}>
           {p.imagem
             ? <Img src={p.imagem} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            : <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: `${4 * k}px dashed rgba(255,255,255,0.5)`, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.7)', fontFamily: FONT_FAMILY.sans, fontSize: 28 * k, textAlign: 'center', padding: 20 * k }}>Escolhe uma imagem no painel</div>}
+            : <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: `${4 * k}px dashed rgba(255,255,255,0.5)`, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.7)', fontFamily: fontOf(p, 'sans'), fontSize: 28 * k, textAlign: 'center', padding: 20 * k }}>Escolhe uma imagem no painel</div>}
         </div>
-        {p.nome && <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 600, fontSize: 56 * k, color: p.cor, opacity: name, transform: `translateY(${(1 - name) * 14 * k}px)`, letterSpacing: '0.02em' }}>{p.nome}</div>}
+        {p.nome && <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 600, fontSize: 56 * k, color: p.cor, opacity: name, transform: `translateY(${(1 - name) * 14 * k}px)`, letterSpacing: '0.02em' }}>{p.nome}</div>}
       </div>
     );
   },

@@ -4,6 +4,9 @@
 import React, { createContext, useContext } from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { easing, type CurveName } from './motion';
+import { DEFAULT_ROLES, THEME_KEY, getTheme, type ThemeRole } from './themes';
+import { FONT_FAMILY } from './fonts';
+import type { TextFont } from './types';
 
 export type FieldDef =
   | { key: string; label: string; type: 'text'; default: string }
@@ -15,7 +18,7 @@ export type FieldDef =
   /** Imagem do projeto (o valor guardado é o id da media; o modelo recebe o URL ou '') */
   | { key: string; label: string; type: 'image'; default: '' };
 
-export type TemplateCategory = 'Títulos' | 'Oráculos' | 'Logótipo' | 'Contagens' | 'Dados' | 'Listas' | 'Fundos' | 'Final';
+export type TemplateCategory = 'Títulos' | 'Oráculos' | 'Logótipo' | 'Contagens' | 'Dados' | 'Listas' | 'Redes sociais' | 'Dispositivos' | 'Apresentação' | 'Fundos' | 'Final';
 
 export interface TemplateDef {
   id: string;
@@ -27,6 +30,8 @@ export interface TemplateDef {
   /** true = tem fundo próprio (ocupa o quadro); false = sobreposição transparente */
   opaque: boolean;
   fields: FieldDef[];
+  /** Papéis de tema para chaves de cor fora do habitual (fundo/cor/destaque/…) */
+  themeRoles?: Record<string, ThemeRole>;
   component: React.FC<{ p: Record<string, any> }>;
 }
 
@@ -34,6 +39,35 @@ export const defineTemplate = (d: TemplateDef): TemplateDef => d;
 
 export function templateDefaults(def: TemplateDef): Record<string, unknown> {
   return Object.fromEntries(def.fields.map((f) => [f.key, f.default]));
+}
+
+/** Aplica um tema: preenche as cores do modelo pelos papéis e guarda o tema (para a letra e o brilho) */
+export function applyTheme(def: TemplateDef, props: Record<string, unknown>, themeId: string): Record<string, unknown> {
+  const th = getTheme(themeId);
+  if (!th) return props;
+  const roles = { ...DEFAULT_ROLES, ...def.themeRoles };
+  const out: Record<string, unknown> = { ...props, [THEME_KEY]: th.id };
+  // modelo transparente sem caixa/fundo próprio: o texto fica por cima do vídeo e tem de ser claro
+  const overlay = !def.opaque && !def.fields.some((f) => f.type === 'color' && roles[f.key] === 'bg');
+  for (const f of def.fields) {
+    if (f.type !== 'color') continue;
+    const role = roles[f.key];
+    if (!role) continue;
+    out[f.key] = overlay && role === 'text' ? th.overlayText : th.colors[role];
+  }
+  return out;
+}
+
+/** Os modelos têm temas se tiverem pelo menos uma cor com papel conhecido */
+export function supportsThemes(def: TemplateDef): boolean {
+  const roles = { ...DEFAULT_ROLES, ...def.themeRoles };
+  return def.fields.some((f) => f.type === 'color' && roles[f.key]);
+}
+
+/** Letra a usar no modelo: a do tema (se o tema impuser uma) ou a do próprio modelo */
+export function fontOf(p: Record<string, unknown>, fallback: TextFont): string {
+  const th = getTheme(p[THEME_KEY]);
+  return FONT_FAMILY[th && th.font !== 'auto' ? th.font : fallback];
 }
 
 /** Duração do clip do modelo (frames), disponível dentro do componente */

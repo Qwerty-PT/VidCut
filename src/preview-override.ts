@@ -64,8 +64,8 @@ export function transitionPreview(p: Project, clipId: string, tr: Transition, la
 }
 
 /** Modelo numa pista temporária no topo, a partir da cabeça de leitura */
-export function templatePreview(p: Project, templateId: string, at: number): PreviewOverride | null {
-  const r = addTemplateClip(p, templateId, at, { newTrack: true });
+export function templatePreview(p: Project, templateId: string, at: number, theme?: string): PreviewOverride | null {
+  const r = addTemplateClip(p, templateId, at, { newTrack: true, theme });
   const c = r.clipId ? findClip(r.project, r.clipId)?.clip : undefined;
   if (!c) return null;
   return { project: r.project, base: p, from: c.start, to: c.start + c.duration - 1, label: `${getTemplate(templateId)?.name ?? 'Modelo'} — duplo clique para adicionar`, key: `tpl:${templateId}` };

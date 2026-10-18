@@ -1,5 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "cinematic-title-intro" (reactvideoeditor/remotion-templates, MIT)
 export default defineTemplate({
@@ -29,11 +28,11 @@ export default defineTemplate({
         {p.barras && <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: barH, background: '#000' }} />}
         {p.barras && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: barH, background: '#000' }} />}
         <div style={{ ...fill, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 * k }}>
-          <div style={{ fontFamily: FONT_FAMILY.serif, fontWeight: 700, fontSize: 130 * k, color: p.cor, letterSpacing: `${0.04 * (1 - reveal)}em`, clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`, textShadow: `0 ${4 * k}px ${24 * k}px rgba(0,0,0,0.5)` }}>
+          <div style={{ fontFamily: fontOf(p, 'serif'), fontWeight: 700, fontSize: 130 * k, color: p.cor, letterSpacing: `${0.04 * (1 - reveal)}em`, clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`, textShadow: `0 ${4 * k}px ${24 * k}px rgba(0,0,0,0.5)` }}>
             {p.titulo}
           </div>
           <div style={{ width: 360 * k * line, height: 3 * k, background: p.destaque }} />
-          <div style={{ fontFamily: FONT_FAMILY.sans, fontSize: 40 * k, color: p.cor, opacity: sub * 0.85, transform: `translateY(${(1 - sub) * 16 * k}px)` }}>
+          <div style={{ fontFamily: fontOf(p, 'sans'), fontSize: 40 * k, color: p.cor, opacity: sub * 0.85, transform: `translateY(${(1 - sub) * 16 * k}px)` }}>
             {p.subtitulo}
           </div>
         </div>

@@ -1,5 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "stat-counter" (reactvideoeditor/remotion-templates, MIT)
 export default defineTemplate({
@@ -25,10 +24,10 @@ export default defineTemplate({
     const fmt = n.toLocaleString('pt-PT');
     return (
       <div style={{ ...fill, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: out }}>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: 220 * k, color: p.destaque, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: 220 * k, color: p.destaque, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {p.prefixo}{fmt}{p.sufixo}
         </div>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontSize: 52 * k, color: p.cor, marginTop: 20 * k, opacity: prog(sec(0.6), 14), transform: `translateY(${(1 - prog(sec(0.6), 14)) * 16 * k}px)` }}>{p.legenda}</div>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontSize: 52 * k, color: p.cor, marginTop: 20 * k, opacity: prog(sec(0.6), 14), transform: `translateY(${(1 - prog(sec(0.6), 14)) * 16 * k}px)` }}>{p.legenda}</div>
       </div>
     );
   },

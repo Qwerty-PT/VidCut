@@ -1,5 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
-import { FONT_FAMILY } from '../shared/fonts';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 
 // Inspirado em "credits-roll" (reactvideoeditor/remotion-templates, MIT)
 export default defineTemplate({
@@ -11,7 +10,7 @@ export default defineTemplate({
   opaque: true,
   fields: [
     { key: 'titulo', label: 'Título', type: 'text', default: 'Obrigado!' },
-    { key: 'texto', label: 'Créditos (Função: Nome)', type: 'textarea', default: 'Realização: Nuno\nMúsica: Nome da banda\n\nUm agradecimento especial: a todos os convidados' },
+    { key: 'texto', label: 'Créditos (Função: Nome)', type: 'textarea', default: 'Realização: O teu nome\nMúsica: Nome da banda\n\nAgradecimentos: a todos os que ajudaram' },
     { key: 'fundo', label: 'Fundo', type: 'color', default: '#000000' },
     { key: 'cor', label: 'Cor do texto', type: 'color', default: '#ffffff' },
     { key: 'destaque', label: 'Cor das funções', type: 'color', default: '#f2b33d' },
@@ -25,7 +24,7 @@ export default defineTemplate({
     const y = height - (frame / Math.max(1, duration - 1)) * (height + total);
     return (
       <div style={{ ...fill, background: p.fundo, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, top: y, textAlign: 'center', fontFamily: FONT_FAMILY.sans }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: y, textAlign: 'center', fontFamily: fontOf(p, 'sans') }}>
           <div style={{ fontWeight: 700, fontSize: 110 * k, color: p.cor, marginBottom: 90 * k }}>{p.titulo}</div>
           {lines.map((l, i) => {
             const [role, ...rest] = l.split(':');

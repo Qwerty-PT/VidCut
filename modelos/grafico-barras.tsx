@@ -1,4 +1,4 @@
-import { defineTemplate, useTemplate, fill } from '../shared/template-api';
+import { defineTemplate, useTemplate, fill , fontOf } from '../shared/template-api';
 import { FONT_FAMILY } from '../shared/fonts';
 
 // Inspirado em "chart-animation" (reactvideoeditor/remotion-templates, MIT)
@@ -28,13 +28,13 @@ export default defineTemplate({
     const out = outro(10);
     return (
       <div style={{ ...fill, background: p.fundo, padding: `${120 * k}px ${180 * k}px`, opacity: out }}>
-        <div style={{ fontFamily: FONT_FAMILY.sans, fontWeight: 700, fontSize: 72 * k, color: p.cor, marginBottom: 60 * k, opacity: prog(0, 14) }}>{p.titulo}</div>
+        <div style={{ fontFamily: fontOf(p, 'sans'), fontWeight: 700, fontSize: 72 * k, color: p.cor, marginBottom: 60 * k, opacity: prog(0, 14) }}>{p.titulo}</div>
         {rows.map((r, i) => {
           const a = prog(12 + i * 5, 24);
           const top = r.v === max;
           return (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: `${300 * k}px 1fr`, alignItems: 'center', gap: 24 * k, marginBottom: 26 * k }}>
-              <div style={{ fontFamily: FONT_FAMILY.sans, fontSize: 40 * k, color: p.cor, opacity: 0.85, textAlign: 'right' }}>{r.label}</div>
+              <div style={{ fontFamily: fontOf(p, 'sans'), fontSize: 40 * k, color: p.cor, opacity: 0.85, textAlign: 'right' }}>{r.label}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 18 * k }}>
                 <div style={{ height: 64 * k, width: `${(r.v / max) * 82 * a}%`, background: top ? p.destaque : p.barra, borderRadius: 4 * k }} />
                 <div style={{ fontFamily: FONT_FAMILY.mono, fontSize: 36 * k, color: p.cor, opacity: a }}>{(Math.round(r.v * a * 10) / 10).toLocaleString('pt-PT')}{p.sufixo}</div>
