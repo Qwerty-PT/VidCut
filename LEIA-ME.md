@@ -243,6 +243,12 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 - **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada
 - **Marcadores na timeline:** tecla M adiciona um marcador com nome e cor na régua; saltar entre marcadores; o íman encosta clips aos marcadores
 - **Pré-visualização em ecrã inteiro:** botão e tecla F para ver o vídeo a tocar em ecrã inteiro, sem a interface (Esc para sair)
+- **Sincronizar pelo som (sound sync):** para quem grava imagem e som em separado (câmara + microfone externo/gravador, ou várias câmaras). Seleciona o vídeo e o áudio → botão direito → "Sincronizar pelo som": o VidCut compara o som da câmara com o do gravador e encosta o áudio no sítio certo, ao fotograma
+  - Como: extrair os dois sons com o ffmpeg (mono, 8 kHz — já o fazemos para as formas de onda), calcular a curva de energia/ataques de cada um e procurar o desfasamento com correlação cruzada (FFT, método GCC-PHAT, robusto a volumes e microfones diferentes), numa janela de ±2 min; refinar à amostra no fim
+  - Confiança: mostrar o resultado ("desfasamento 3,42 s · confiança alta"); se for baixa (som da câmara muito fraco ou sem partes em comum), avisar e sugerir bater palmas no início da próxima gravação
+  - Depois de sincronizar: silenciar o som da câmara (ou deixá-lo baixo) e ligar os dois clips, para se moverem e cortarem juntos
+  - Gravações longas: os relógios da câmara e do gravador derivam (alguns fotogramas por hora) — medir o desfasamento no início e no fim e corrigir com um pequeno ajuste de velocidade no áudio
+  - Várias câmaras: sincronizar todas com o mesmo áudio de referência (base para um futuro modo multicâmara)
 
 ### Backlog — mais tarde (não fazer em conjunto com o anterior)
 
