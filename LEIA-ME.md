@@ -202,11 +202,17 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
   - Caminhos relativos ao ficheiro do projeto (pasta do projeto + `media/`) — funciona com pen, iCloud, Drive, Dropbox e entre Mac/Windows/Linux
   - Reencontrar ficheiros em falta ao abrir: escolher pasta, procura por nome + tamanho, um encontrado reencontra os restantes
   - "Empacotar projeto": copia projeto + ficheiros usados para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
+- **Legendas automáticas (local):** Whisper via whisper.cpp (`@remotion/install-whisper-cpp` + `@remotion/captions`), offline e grátis, modelo descarregado uma vez (base / small (sugerido) / medium). Áudio extraído com o ffmpeg incluído → pista de legendas com tempo por palavra, editável na timeline (juntar/partir, ajustar tempos). Estilos: clássico em baixo e palavra a palavra (TikTok/Reels) com curvas IBM. Importar/exportar .srt; no export queimadas no vídeo ou .srt à parte
 - Mais transições: direções, formas, desfocar, flash, glitch
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
 - Lottie: animações prontas (.json)
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
-- Sugestões em aberto: legendas (.srt / automáticas), ecrã verde, aceleração por hardware no export (Mac), marcadores na timeline, pré-visualização em ecrã inteiro
+- Sugestões em aberto: ecrã verde, aceleração por hardware no export (Mac), marcadores na timeline, pré-visualização em ecrã inteiro
+
+### Backlog — mais tarde (não fazer em conjunto com o anterior)
+
+- **Legendas pela nuvem:** opção alternativa à transcrição local (API OpenAI Whisper ou ElevenLabs) — mais rápida/precisa, paga ao minuto, o áudio sai do computador; chave de API nas definições
+- **Tradução de legendas:** gerar a versão noutra língua (ex. API do Claude)
 
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
