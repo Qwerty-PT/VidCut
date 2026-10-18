@@ -6,6 +6,7 @@ const { createMediaServer } = require('./media-server.cjs');
 const { renderProject } = require('./render.cjs');
 const { getPeaks } = require('./peaks.cjs');
 const { createLottieLibrary } = require('./lottie-lib.cjs');
+const { transcribeMedia, captionsStatus } = require('./captions.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -87,6 +88,9 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Importar media…', accelerator: 'CmdOrCtrl+I', click: send('import') },
         { label: 'Exportar vídeo…', accelerator: 'CmdOrCtrl+E', click: send('export') },
+        { type: 'separator' },
+        { label: 'Importar legendas (.srt)…', click: send('importSrt') },
+        { label: 'Exportar legendas (.srt)…', click: send('exportSrt') },
         { type: 'separator' },
         isMac ? { role: 'close', label: 'Fechar' } : { role: 'quit', label: 'Sair' },
       ],
@@ -216,6 +220,41 @@ ipcMain.handle('lottie:import', async (_e, paths) => {
 });
 ipcMain.handle('lottie:remove', (_e, id) => lib().remove(String(id)));
 ipcMain.handle('lottie:rename', (_e, id, name) => lib().rename(String(id), String(name)));
+
+// ---------- legendas automáticas (whisper.cpp local) ----------
+let currentCaptions = null;
+ipcMain.handle('captions:status', () => captionsStatus(app.getPath('userData')));
+ipcMain.handle('captions:start', async (_e, o) => {
+  if (currentCaptions) return { ok: false, error: 'Já há uma transcrição em curso.' };
+  if (!o || typeof o.file !== 'string' || !require('node:fs').existsSync(o.file)) return { ok: false, error: 'Ficheiro não encontrado.' };
+  const job = transcribeMedia({
+    dataDir: app.getPath('userData'), file: o.file,
+    startSec: Math.max(0, Number(o.startSec) || 0), durSec: Math.max(0, Number(o.durSec) || 0),
+    model: String(o.model || 'small'), language: o.language ? String(o.language) : null,
+  }, (p) => win?.webContents.send('captions:progress', p));
+  currentCaptions = job;
+  try { return { ok: true, ...(await job.promise) }; }
+  catch (err) {
+    const msg = String(err?.message || err);
+    if (/abort|cancel/i.test(msg)) return { ok: false, canceled: true };
+    const hint = /spawn (git|make)|ENOENT/.test(msg)
+      ? (process.platform === 'darwin' ? '\n\nFalta o git/make: instala as ferramentas de linha de comandos da Apple (no Terminal: xcode-select --install) e tenta outra vez.' : '\n\nFalta o git ou o make (ferramentas de compilação).')
+      : '';
+    return { ok: false, error: msg + hint };
+  } finally { currentCaptions = null; }
+});
+ipcMain.handle('captions:cancel', () => { currentCaptions?.cancel(); return true; });
+ipcMain.handle('captions:saveSrt', async (_e, text, name) => {
+  const r = await dialog.showSaveDialog(win, { title: 'Exportar legendas', defaultPath: `${String(name || 'legendas').replace(/[\\/:*?"<>|]/g, '_')}.srt`, filters: [{ name: 'Legendas SRT', extensions: ['srt'] }] });
+  if (r.canceled || !r.filePath) return null;
+  await fs.writeFile(r.filePath, '\uFEFF' + String(text), 'utf8');
+  return r.filePath;
+});
+ipcMain.handle('captions:openSrt', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Importar legendas', properties: ['openFile'], filters: [{ name: 'Legendas SRT', extensions: ['srt'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  return { name: path.basename(r.filePaths[0]), text: await fs.readFile(r.filePaths[0], 'utf8') };
+});
 
 ipcMain.handle('media:peaks', async (_e, file) => {
   try { return new Uint8Array(await getPeaks(file, path.join(app.getPath('userData'), 'peaks'))); }

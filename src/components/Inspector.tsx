@@ -2,10 +2,11 @@ import React from 'react';
 import { useEditor } from '../editor-context';
 import { TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
+import { openCaptions } from '../captions-ui';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
-import { AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { CaptionSection, AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
@@ -152,10 +153,11 @@ export const Inspector: React.FC = () => {
   if (isText && clip.text) {
     return (
       <aside className="panel inspector">
-        <header className="panel-head"><h2>Texto</h2></header>
+        <header className="panel-head"><h2>{clip.caption ? 'Legenda' : 'Texto'}</h2></header>
         <div className="inspector-body">
           <TextFields clip={clip} text={clip.text} />
-          <AnimSection clip={clip} isText fps={fps} />
+          {clip.caption && <CaptionSection clip={clip} projectName={project.name} />}
+          {(!clip.caption || clip.caption.style === 'classic') && <AnimSection clip={clip} isText fps={fps} />}
           {actions}
         </div>
       </aside>
@@ -197,6 +199,12 @@ export const Inspector: React.FC = () => {
                 </p>
               </div>
             ) : <p className="hint">Os dados desta animação não estão no projeto.</p>)}
+
+            {(media?.kind === 'video' || media?.kind === 'audio') && !clip.lottie && !clip.template && (
+              <button className="btn block cap-gen" title="Transcreve a fala deste clip e cria legendas sincronizadas" onClick={() => openCaptions(clip.id)}>
+                <Icon name="captions" size={16} /> Gerar legendas
+              </button>
+            )}
 
             {media?.kind === 'video' && isVisual && (
               <div className="audio-box">

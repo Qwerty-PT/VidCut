@@ -18,6 +18,7 @@
     "dist:linux": "npm run build && electron-builder --linux --x64 --publish never"
   },
   "dependencies": {
+    "@remotion/install-whisper-cpp": "^4.0.533",
     "@remotion/renderer": "4.0.533",
     "fflate": "^0.8.3",
     "react": "19.2.0",

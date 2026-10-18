@@ -681,3 +681,13 @@ body.tf-dragging, body.tf-dragging * { user-select: none; }
 .lot-sources a:hover { text-decoration: underline; }
 .lot-sources span { color: var(--text-faint); }
 .bin-tabs button { white-space: nowrap; }
+
+/* ---------- legendas ---------- */
+.captions-modal { width: min(500px, calc(100vw - 32px)); }
+.captions-modal .exp-row select { height: 30px; padding: 0 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); width: 100%; }
+.progress-bar[data-indeterminate] { width: 35% !important; animation: cap-indet 1.4s cubic-bezier(0.4, 0.14, 0.3, 1) infinite; }
+@keyframes cap-indet { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.cap-gen { margin-top: 2px; }
+.btn-col { display: flex; flex-direction: column; gap: 8px; }
+.clip.kind-text:has(.clip-name) { }
+.bin-head .btn.icon-only { width: 28px; padding: 0; justify-content: center; flex: none; }

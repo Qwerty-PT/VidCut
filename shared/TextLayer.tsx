@@ -4,6 +4,10 @@ import type { Clip, TextContent } from './types';
 import { animState, blockStyle, staggerProgress } from './anim';
 import { FONT_FAMILY } from './fonts';
 import { valuesAt } from './keyframes';
+import { activeWord } from './captions';
+import { easing } from './motion';
+
+const popEase = easing('expressive-entrance');
 
 function hexToRgba(hex: string, a: number): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -61,6 +65,40 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
           <span key={i} style={{ display: 'inline-block', opacity: p, transform: `translateY(${(1 - p) * dist * 0.6}px)` }}>
             {tok}
           </span>
+        );
+      });
+    }
+  }
+
+  // ---------- legendas com tempo por palavra ----------
+  const cap = clip.caption;
+  if (cap && cap.style !== 'classic' && cap.words.length) {
+    const idx = activeWord(cap.words, frame);
+    if (cap.style === 'pop') {
+      const w = idx >= 0 ? cap.words[idx] : null;
+      const p = w ? popEase(Math.min(1, Math.max(0, (frame - w.s) / 4))) : 0;
+      content = w ? <span style={{ display: 'inline-block', opacity: p, transform: `scale(${0.72 + 0.28 * p})` }}>{w.t}</span> : null;
+    } else {
+      content = cap.words.map((w, i) => {
+        const sp = i < cap.words.length - 1 ? ' ' : '';
+        if (cap.style === 'karaoke') {
+          return <span key={i} style={{ color: i <= idx ? cap.highlight : text.color, opacity: i <= idx ? 1 : 0.88 }}>{w.t}{sp}</span>;
+        }
+        // caixa: a palavra atual ganha uma caixa de cor que aparece depressa (IBM entrada expressiva, ~130 ms)
+        const on = i === idx;
+        const p = on ? popEase(Math.min(1, Math.max(0, (frame - w.s) / 4))) : 0;
+        return (
+          <React.Fragment key={i}>
+            <span style={{
+              display: 'inline-block', position: 'relative', padding: `0 ${0.1 * fontSize}px`, margin: `0 ${-0.04 * fontSize}px`,
+              color: on ? '#111214' : text.color, zIndex: on ? 1 : 0,
+              textShadow: on ? 'none' : undefined,
+            }}>
+              {on && <span style={{ position: 'absolute', inset: `${0.02 * fontSize}px 0`, background: cap.highlight, borderRadius: 0.16 * fontSize, transform: `scale(${0.8 + 0.2 * p})`, opacity: p, zIndex: -1 }} />}
+              {w.t}
+            </span>
+            {sp}
+          </React.Fragment>
         );
       });
     }

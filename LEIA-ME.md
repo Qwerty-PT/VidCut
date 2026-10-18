@@ -46,6 +46,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Animações Lottie** (separador Animações): pack de 18 animações originais com curvas IBM (ícones, celebração, social, desenhado à mão, interface), miniaturas que tocam ao passar o rato, duplo clique ou arrastar para a timeline. "As minhas": importar `.json` e `.lottie` (botão ou arrastar), fica guardado na pasta de dados da app; atalhos para LottieFiles, Lordicon, IconScout e useAnimations. Na timeline comportam-se como imagens (enquadrar, cor, keyframes, transições), com loop e velocidade. Os dados ficam **dentro do ficheiro do projeto** (abre noutro computador sem a biblioteca); ao guardar, as que já não se usam são removidas. Pack gerado por `scripts/gen-lotties.py`
 
+- **Legendas automáticas (locais):** seleciona um clip com fala → **Gerar legendas** (painel ou botão direito). Transcrição no próprio computador com o Whisper (whisper.cpp 1.5.5 via `@remotion/install-whisper-cpp`): na 1.ª vez prepara o motor (1–3 min; no Mac precisa das ferramentas da Apple — `xcode-select --install`) e descarrega o modelo escolhido (Rápido ~140 MB / Equilibrado ~470 MB / Preciso ~1,5 GB), tudo na pasta de dados da app. Cria uma pista **Legendas** com frases curtas e tempo por palavra. Estilos: Clássico (frase com fundo), Karaoke (palavra dita colorida), Caixa (palavra atual com caixa de cor, estilo Reels) e Palavra (uma de cada vez, grande). Editar o texto mantém os tempos se o nº de palavras for igual; dividir/aparar reparte as palavras. "Aplicar este aspeto a todas"; **Ficheiro → Importar/Exportar legendas (.srt)**. No export vídeo ficam queimadas na imagem
+
 ## Requisitos
 
 - Node.js 20 ou superior
@@ -206,7 +208,6 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
   - "Empacotar projeto": copia projeto + tudo o que usa (media, Lotties, modelos próprios da pasta `modelos/`) para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
   - Lotties usados ficam embutidos no próprio ficheiro do projeto (são pequenos) — abre noutro computador mesmo sem a animação na biblioteca de lá; ao abrir, oferece acrescentá-la à biblioteca local
   - Modelos próprios em falta no outro computador: aviso claro (nome do modelo) e o clip mantém-se, pronto a voltar quando o modelo for instalado
-- **Legendas automáticas (local):** Whisper via whisper.cpp (`@remotion/install-whisper-cpp` + `@remotion/captions`), offline e grátis, modelo descarregado uma vez (base / small (sugerido) / medium). Áudio extraído com o ffmpeg incluído → pista de legendas com tempo por palavra, editável na timeline (juntar/partir, ajustar tempos). Estilos: clássico em baixo e palavra a palavra (TikTok/Reels) com curvas IBM. Importar/exportar .srt; no export queimadas no vídeo ou .srt à parte
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export

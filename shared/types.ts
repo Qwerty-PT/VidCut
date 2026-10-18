@@ -52,6 +52,8 @@ export interface Clip {
   keyframes?: Keyframe[];
   /** Clips de modelo programático (mediaId vazio) */
   template?: { id: string; props: Record<string, unknown> };
+  /** Legenda: palavras com tempos (frames relativos ao início do clip) e estilo */
+  caption?: CaptionData;
   /** Animação Lottie (os dados ficam embutidos em project.lotties) */
   lottie?: { assetId: string; loop: boolean };
 }
@@ -156,6 +158,22 @@ export interface Track {
   muted: boolean;
   hidden: boolean;
   clips: Clip[];
+}
+
+export type CaptionStyle = 'classic' | 'karaoke' | 'box' | 'pop';
+
+export interface CaptionWord {
+  t: string;
+  /** início e fim em frames, relativos ao início do clip */
+  s: number;
+  e: number;
+}
+
+export interface CaptionData {
+  words: CaptionWord[];
+  style: CaptionStyle;
+  /** Cor de destaque da palavra atual */
+  highlight: string;
 }
 
 /** Animação Lottie embutida no projeto (vai com o ficheiro para outro computador) */

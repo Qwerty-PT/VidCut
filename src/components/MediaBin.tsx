@@ -65,7 +65,7 @@ export const MediaBin: React.FC = () => {
           <button role="tab" aria-selected={tab === 'templates'} className={tab === 'templates' ? 'on' : ''} onClick={() => setTab('templates')}>Modelos</button>
           <button role="tab" aria-selected={tab === 'lottie'} className={tab === 'lottie' ? 'on' : ''} onClick={() => setTab('lottie')}>Animações</button>
         </div>
-        {tab === 'media' && <button className="btn small" onClick={pick}><Icon name="import" size={16} /> Importar</button>}
+        {tab === 'media' && <button className="btn small icon-only" onClick={pick} title="Importar media (Ctrl+I)" aria-label="Importar media"><Icon name="import" size={16} /></button>}
       </header>
       {tab === 'lottie' ? <LottieLibrary /> : tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
         <button className="empty-drop" onClick={pick}>

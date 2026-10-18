@@ -23,6 +23,7 @@ const P: Record<string, React.ReactNode> = {
   volume: <><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor" /><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" /></>,
   mute: <><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></>,
   plus: <><path d="M12 5v14M5 12h14" /></>,
+  captions: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M10.5 10.2a2 2 0 100 3.6M17 10.2a2 2 0 100 3.6" /></>,
   close: <><path d="M6 6l12 12M18 6L6 18" /></>,
   sparkle: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /></>,
   minus: <path d="M5 12h14" />,

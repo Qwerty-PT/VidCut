@@ -68,4 +68,4 @@ async function getPeaks(file, cacheDir) {
   return inflight.get(key);
 }
 
-module.exports = { getPeaks, PER_SEC };
+module.exports = { getPeaks, PER_SEC, ffmpegPath };

@@ -16,6 +16,10 @@ import { ExportOptionsModal, loadExportOptions } from './components/ExportOption
 import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '../shared/export';
 import { changeFps } from './ops';
 import { pruneLotties } from '../shared/lottie';
+import { CaptionsModal } from './components/CaptionsModal';
+import { useCaptionsTarget } from './captions-ui';
+import { pagesToClips, parseSrt, srtToPages, toSrt } from '../shared/captions';
+import { addCaptionTrack } from './ops';
 import { Icon } from './components/Icon';
 
 type Toast = { id: number; msg: string; kind: 'info' | 'error' };
@@ -27,6 +31,7 @@ export const App: React.FC = () => {
   const [mediaBase, setMediaBase] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ExportState | null>(null);
   const [exportSetup, setExportSetup] = useState(false);
+  const captionsTarget = useCaptionsTarget();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const clipboard = useRef<ClipboardData | null>(null);
@@ -176,14 +181,33 @@ export const App: React.FC = () => {
     } finally { off(); }
   };
 
+  const doImportSrt = async () => {
+    const r = await api().captionsOpenSrt();
+    if (!r) return;
+    const items = parseSrt(r.text);
+    if (!items.length) return notify('Não encontrei legendas válidas nesse ficheiro .srt', 'error');
+    const clips = pagesToClips(srtToPages(items), { fps: stateRef.current.project.fps, startFrame: 0, style: 'classic' });
+    commit((p) => { const t = addCaptionTrack(p, clips); return { project: t.project, select: [clips[0].id] }; });
+    notify(`${clips.length} legendas importadas de ${r.name}`);
+  };
+
+  const doExportSrt = async () => {
+    const s = stateRef.current;
+    const sel = s.project.tracks.find((t) => t.clips.some((c) => s.selection.includes(c.id) && c.text));
+    const track = sel ?? s.project.tracks.find((t) => t.clips.some((c) => c.caption)) ?? s.project.tracks.find((t) => t.kind === 'text' && t.clips.length);
+    if (!track) return notify('Não há legendas nem texto para exportar', 'error');
+    const out = await api().captionsSaveSrt(toSrt(track.clips, s.project.fps), `${s.project.name} - ${track.name}`);
+    if (out) notify('Legendas exportadas para .srt');
+  };
+
   const doImport = async () => {
     const paths = await api().pickMedia();
     if (paths.length) await importPaths(paths);
   };
 
   // ---------- atalhos ----------
-  const actions = useRef({ doNew, doOpen, doSave, doExport, doImport });
-  actions.current = { doNew, doOpen, doSave, doExport, doImport };
+  const actions = useRef({ doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt });
+  actions.current = { doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt };
 
   useEffect(() => {
     if (!inElectron) return;
@@ -197,6 +221,8 @@ export const App: React.FC = () => {
         case 'saveAs': a.doSave(true); break;
         case 'import': a.doImport(); break;
         case 'export': a.doExport(); break;
+        case 'importSrt': a.doImportSrt(); break;
+        case 'exportSrt': a.doExportSrt(); break;
         case 'undo': if (typing) api().nativeEdit('undo'); else dispatch({ type: 'undo' }); break;
         case 'redo': if (typing) api().nativeEdit('redo'); else dispatch({ type: 'redo' }); break;
         case 'copy': case 'cut': case 'paste': case 'selectAll': case 'duplicate': {
@@ -228,7 +254,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e) || exporting || exportSetup) return;
+      if (isTyping(e) || exporting || exportSetup || captionsTarget) return;
       const s = stateRef.current;
       const dur = projectDuration(s.project);
       const mod = e.ctrlKey || e.metaKey;
@@ -267,7 +293,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commit, exporting, exportSetup]);
+  }, [commit, exporting, exportSetup, captionsTarget]);
 
   const ctx = useMemo<EditorCtx | null>(
     () => (mediaBase === null ? null : { state, dispatch, commit, mediaBase, importPaths, notify }),
@@ -311,6 +337,7 @@ export const App: React.FC = () => {
         <div className="toasts">
           {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.msg}</div>)}
         </div>
+        {captionsTarget && <CaptionsModal clipId={captionsTarget} />}
         {exportSetup && (
           <ExportOptionsModal
             project={state.project}

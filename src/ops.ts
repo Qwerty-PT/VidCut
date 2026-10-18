@@ -1,7 +1,8 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, ClipColor, ClipTransform, KfEasing, KfProp, LottieAsset, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { CaptionStyle, Clip, ClipColor, ClipTransform, KfEasing, KfProp, LottieAsset, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
 import { lottieInfo } from '../shared/lottie';
+import { captionText, retimeWords, sliceCaption } from '../shared/captions';
 import { clipSpeed } from '../shared/types';
 import { getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
@@ -209,7 +210,8 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const fadeIn = Math.min(origin.fadeIn, duration);
   const fadeOut = Math.min(origin.fadeOut, duration);
   const keyframes = edge === 'left' ? shiftKeyframes(origin.keyframes, origin.start - start) : origin.keyframes;
-  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut, keyframes });
+  const cap = origin.caption ? sliceCaption(origin, start - origin.start, start - origin.start + duration) : {};
+  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut, keyframes, ...cap });
 }
 
 export function updateClip(p: Project, clipId: string, patch: Partial<Clip>): Project {
@@ -254,7 +256,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
     for (const c of t.clips) {
       if (set.has(c.id) && frame > c.start && frame < c.start + c.duration) {
         const leftDur = frame - c.start;
-        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur) };
+        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur), ...sliceCaption(c, 0, leftDur) };
         const right: Clip = {
           ...c,
           id: uid('c'),
@@ -266,6 +268,7 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
           trimStart: Math.round(c.trimStart + leftDur * clipSpeed(c)),
           fadeIn: 0,
           fadeOut: Math.min(c.fadeOut, c.duration - leftDur),
+          ...sliceCaption(c, leftDur, c.duration),
         };
         clips.push(left, right);
         created.push(right.id);
@@ -437,7 +440,44 @@ export function addTextClip(p: Project, start: number): { project: Project; clip
 export function updateText(p: Project, clipId: string, patch: Partial<TextContent>): Project {
   const f = findClip(p, clipId);
   if (!f?.clip.text) return p;
-  return updateClip(p, clipId, { text: { ...f.clip.text, ...patch } });
+  const caption = f.clip.caption && patch.text !== undefined && patch.text !== f.clip.text.text
+    ? retimeWords(f.clip.caption, patch.text, f.clip.duration) : f.clip.caption;
+  return updateClip(p, clipId, { text: { ...f.clip.text, ...patch }, ...(caption ? { caption } : {}) });
+}
+
+// ---------------------------------------------------------------------------
+// Legendas
+// ---------------------------------------------------------------------------
+
+/** Cria uma pista de texto "Legendas" no topo com os clips dados */
+export function addCaptionTrack(p: Project, clips: Clip[]): { project: Project; trackId: string } {
+  const r = addTrack(p, 'text', true);
+  const n = p.tracks.filter((t) => t.kind === 'text' && /^Legendas/.test(t.name)).length;
+  const name = n ? `Legendas ${n + 1}` : 'Legendas';
+  const project = mapTrack(r.project, r.trackId, (t) => ({ ...t, name, clips: sortClips(clips) }));
+  return { project, trackId: r.trackId };
+}
+
+/** Aplica estilo (e aspeto do texto) de uma legenda a todas as legendas da mesma pista */
+export function applyCaptionLook(p: Project, clipId: string, opts: { style?: CaptionStyle; highlight?: string; copyText?: boolean }): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.caption || !f.clip.text) return p;
+  const src = f.clip;
+  return mapTrack(p, f.track.id, (t) => ({
+    ...t,
+    clips: t.clips.map((c) => {
+      if (!c.caption || !c.text) return c;
+      const style = opts.style ?? c.caption.style;
+      const prevStyle = c.caption.style;
+      let text = opts.copyText ? { ...src.text!, text: c.text.text } : c.text;
+      if (opts.style && opts.style !== prevStyle && !opts.copyText) {
+        const base = captionText(style);
+        text = { ...text, background: base.background, size: base.size, y: base.y };
+      }
+      const animIn = style === 'classic' ? { preset: 'fade' as const, duration: Math.min(5, c.duration), style: 'productive' as const } : undefined;
+      return { ...c, text, animIn, caption: { ...c.caption, style, highlight: opts.highlight ?? (opts.copyText ? src.caption!.highlight : c.caption.highlight) } };
+    }),
+  }));
 }
 
 /** Atualiza a transformação de um clip (parcial; o recorte é fundido) */

@@ -8,6 +8,8 @@ export interface ExportProgress {
   message?: string;
 }
 
+export interface CaptionsStatus { installed: boolean; models: Record<string, boolean>; sizes: Record<string, number> }
+
 export interface LottieLibItem { id: string; name: string; data: Record<string, unknown> }
 
 export interface AutosaveData { project: Project; filePath: string | null; dirty: boolean }
@@ -26,6 +28,12 @@ export interface VidCutApi {
   showItem(p: string): Promise<boolean>;
   peaks(file: string): Promise<Uint8Array>;
   nativeEdit(action: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'): Promise<boolean>;
+  captionsStatus(): Promise<CaptionsStatus>;
+  captionsStart(o: { file: string; startSec: number; durSec: number; model: string; language: string | null }): Promise<{ ok: boolean; captions?: { text: string; startMs: number; endMs: number }[]; language?: string; error?: string; canceled?: boolean }>;
+  captionsCancel(): Promise<boolean>;
+  captionsSaveSrt(text: string, name: string): Promise<string | null>;
+  captionsOpenSrt(): Promise<{ name: string; text: string } | null>;
+  onCaptionsProgress(cb: (p: { stage: string; progress: number; message: string }) => void): () => void;
   lottieList(): Promise<LottieLibItem[]>;
   lottieImport(paths?: string[]): Promise<{ added: LottieLibItem[]; errors: string[] }>;
   lottieRemove(id: string): Promise<boolean>;

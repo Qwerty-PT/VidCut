@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useEditor } from '../editor-context';
 import { addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { getLottieEntry } from '../lottie-registry';
+import { openCaptions } from '../captions-ui';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
@@ -570,6 +571,11 @@ export const Timeline: React.FC = () => {
             {f.clip.audioDetached && (
               <button role="menuitem" onPointerDown={run(() => commit((p) => reattachAudio(p, menu.clipId)))}>
                 <Icon name="link" size={15} /> Voltar a juntar o áudio
+              </button>
+            )}
+            {(() => { const m = project.media.find((x) => x.id === f.clip.mediaId); return m && (m.kind === 'video' || m.kind === 'audio'); })() && (
+              <button role="menuitem" onPointerDown={run(() => openCaptions(menu.clipId))}>
+                <Icon name="captions" size={15} /> Gerar legendas…
               </button>
             )}
             <div className="ctx-sep" />

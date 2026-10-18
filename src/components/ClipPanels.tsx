@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { updateTemplateProps, DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, addKeyframe, clearKeyframes, removeKeyframe, setAnimatedProps, setKeyframeEasing, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
+import { applyCaptionLook, updateTemplateProps, DEFAULT_COLOR, SPEED_MAX, SPEED_MIN, addKeyframe, clearKeyframes, removeKeyframe, setAnimatedProps, setKeyframeEasing, setSpeed, updateClip, updateColor, updateText, updateTransform } from '../ops';
 import { useFrame, playhead } from '../playhead';
 import { KF_EASINGS, keyframeAt, valuesAt } from '../../shared/keyframes';
 import type { FieldDef, TemplateDef } from '../../shared/template-api';
@@ -12,6 +12,8 @@ import { LAYOUT_PRESETS, applyLayoutPreset, getTransform, isDefaultTransform } f
 import { ANIM_PRESETS } from '../../shared/anim';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 import { FONT_LABEL } from '../../shared/fonts';
+import { CAPTION_STYLES, toSrt } from '../../shared/captions';
+import { api } from '../api';
 
 /** Campos de edição de um clip de texto */
 export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, text }) => {
@@ -459,6 +461,44 @@ export const TemplateFields: React.FC<{ clip: Clip; def: TemplateDef }> = ({ cli
             return null;
         }
       })}
+    </section>
+  );
+};
+
+/** Secção "Legenda" para clips de texto criados pela transcrição (ou importados de .srt) */
+export const CaptionSection: React.FC<{ clip: Clip; projectName: string }> = ({ clip, projectName }) => {
+  const { commit, state, notify } = useEditor();
+  const cap = clip.caption;
+  if (!cap) return null;
+  const track = state.project.tracks.find((t) => t.clips.some((c) => c.id === clip.id));
+  const others = track ? track.clips.filter((c) => c.caption).length : 0;
+  const exportSrt = async () => {
+    if (!track) return;
+    const out = await api().captionsSaveSrt(toSrt(track.clips, state.project.fps), `${projectName} - ${track.name}`);
+    if (out) notify('Legendas exportadas para .srt');
+  };
+  return (
+    <section className="section">
+      <h3 className="section-title">Legenda</h3>
+      <Row label="Estilo (todas as legendas da pista)">
+        <Segmented label="Estilo da legenda" value={cap.style} onChange={(style) => commit((p) => applyCaptionLook(p, clip.id, { style }))}
+          options={CAPTION_STYLES.map((c) => ({ value: c.style, label: c.label, title: c.hint }))} />
+      </Row>
+      {cap.style !== 'classic' && cap.style !== 'pop' && (
+        <Row label="Cor de destaque">
+          <span className="color-row">
+            <input type="color" value={cap.highlight} onChange={(e) => commit((p) => applyCaptionLook(p, clip.id, { highlight: e.target.value }))} />
+            <code>{cap.highlight}</code>
+          </span>
+        </Row>
+      )}
+      <div className="btn-col">
+        <button className="btn block" title="Copia a letra, tamanho, cor, fundo e posição desta legenda para as outras" onClick={() => commit((p) => applyCaptionLook(p, clip.id, { copyText: true }))}>
+          Aplicar este aspeto às {others} legendas
+        </button>
+        <button className="btn block" onClick={exportSrt}>Exportar legendas (.srt)</button>
+      </div>
+      <p className="hint">Ao corrigir o texto, os tempos das palavras mantêm-se se o número de palavras for igual; se não, são redistribuídos pela duração do clip.</p>
     </section>
   );
 };

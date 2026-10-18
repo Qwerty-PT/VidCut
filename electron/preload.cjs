@@ -16,6 +16,16 @@ contextBridge.exposeInMainWorld('vidcut', {
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   peaks: (file) => ipcRenderer.invoke('media:peaks', file),
   nativeEdit: (action) => ipcRenderer.invoke('edit:native', action),
+  captionsStatus: () => ipcRenderer.invoke('captions:status'),
+  captionsStart: (o) => ipcRenderer.invoke('captions:start', o),
+  captionsCancel: () => ipcRenderer.invoke('captions:cancel'),
+  captionsSaveSrt: (text, name) => ipcRenderer.invoke('captions:saveSrt', text, name),
+  captionsOpenSrt: () => ipcRenderer.invoke('captions:openSrt'),
+  onCaptionsProgress: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on('captions:progress', h);
+    return () => ipcRenderer.removeListener('captions:progress', h);
+  },
   lottieList: () => ipcRenderer.invoke('lottie:list'),
   lottieImport: (paths) => ipcRenderer.invoke('lottie:import', paths),
   lottieRemove: (id) => ipcRenderer.invoke('lottie:remove', id),
