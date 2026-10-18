@@ -1,9 +1,12 @@
-# Publica uma versão: ao enviar uma etiqueta vX.Y.Z, compila os instaladores
-# em Mac, Windows e Linux e cria a Release no GitHub (é aí que a app procura atualizações).
+# Publica uma versão: quando a versão do package.json muda no main (ou ao enviar uma etiqueta vX.Y.Z),
+# compila os instaladores em Mac, Windows e Linux e cria a Release no GitHub
+# (é aí que a app procura atualizações). Se a versão já estiver publicada, não faz nada.
 name: Publicar versão
 
 on:
   push:
+    branches: [main]
+    paths: [package.json, .github/workflows/release.yml]
     tags: ['v*']
   workflow_dispatch:
 
@@ -11,7 +14,28 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A versão $V já está publicada."; echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Vou publicar a versão $V."; echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.publish == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -46,8 +70,7 @@ jobs:
             release/*.deb
 
   release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,12 +80,14 @@ jobs:
           merge-multiple: true
       - name: Notas da versão (secção do NOVIDADES.md)
         run: |
-          V="${GITHUB_REF_NAME#v}"
+          V="${{ needs.check.outputs.version }}"
           awk -v v="$V" '$0 ~ "^## "v"( |$)" {on=1; next} /^## / && on {exit} on' NOVIDADES.md > notas.md || true
           [ -s notas.md ] || echo "Versão $V" > notas.md
           cat notas.md
       - uses: softprops/action-gh-release@v2
         with:
-          name: VidCut ${{ github.ref_name }}
+          tag_name: v${{ needs.check.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: VidCut ${{ needs.check.outputs.version }}
           body_path: notas.md
           files: artifacts/*

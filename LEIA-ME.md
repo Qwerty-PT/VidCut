@@ -126,8 +126,8 @@ Notas:
 ## Publicar uma versão
 
 1. Sobe a versão no `package.json` (ex.: `0.19.0` → `0.20.0`) e escreve a secção `## 0.20.0` em `NOVIDADES.md`
-2. `git commit -am "0.20.0" && git tag v0.20.0 && git push && git push --tags`
-3. O GitHub Actions (`.github/workflows/release.yml`) compila em Mac (Apple Silicon), Windows e Linux e cria a Release com `.dmg`, `.zip`, `-Setup.exe`, `-Portatil.exe`, `.AppImage` e `.deb` (10–20 min; acompanha no separador **Actions** do repositório)
+2. `git commit -am "0.20.0" && git push` (para o `main`)
+3. Ao ver a versão nova no `package.json`, o GitHub Actions (`.github/workflows/release.yml`) compila em Mac (Apple Silicon), Windows e Linux e cria a Release com `.dmg`, `.zip`, `-Setup.exe`, `-Portatil.exe`, `.AppImage` e `.deb` (10–20 min; acompanha no separador **Actions** do repositório)
 4. As apps instaladas veem a versão nova no próximo arranque
 
 ## Atalhos
