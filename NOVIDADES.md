@@ -2,6 +2,10 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.24.1
+
+- Mac: corrigido o erro "ENOTEMPTY: directory not empty" ao atualizar, quando tinha ficado uma atualização antiga a meio
+
 ## 0.24.0
 
 - Inverter clip: o vídeo (e o som) passa a andar para trás; "Pôr a direito" volta ao original

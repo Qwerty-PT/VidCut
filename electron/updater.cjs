@@ -164,20 +164,24 @@ function createUpdater({ send }) {
       // .../VidCut.app/Contents/MacOS/VidCut → .../VidCut.app
       const appPath = path.resolve(process.execPath, '..', '..', '..');
       const work = path.join(dir(), 'novo');
-      await fsp.rm(work, { recursive: true, force: true });
+      // Não usar fs.rm: o fs do Electron trata o app.asar de uma app antiga que tenha ficado aqui como pasta
+      // e falha com ENOTEMPTY. O rm do sistema apaga tudo.
+      await new Promise((res) => execFile('/bin/rm', ['-rf', work], () => res()));
       await fsp.mkdir(work, { recursive: true });
       await new Promise((res, rej) => execFile('/usr/bin/ditto', ['-x', '-k', file, work], (e) => (e ? rej(e) : res())));
       const name = (await fsp.readdir(work)).find((n) => n.endsWith('.app'));
       if (!name) throw new Error('O pacote da atualização não tem a app.');
       const newApp = path.join(work, name);
       const script = path.join(dir(), 'instalar.sh');
+      const log = path.join(dir(), 'instalar.log');
       await fsp.writeFile(script, [
         '#!/bin/bash',
+        `exec >"${log}" 2>&1`,
         `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done`,
         `rm -rf "${appPath}.antigo"`,
         `mv "${appPath}" "${appPath}.antigo" && mv "${newApp}" "${appPath}" || { mv "${appPath}.antigo" "${appPath}"; open "${appPath}"; exit 1; }`,
         `xattr -cr "${appPath}" 2>/dev/null`,
-        `rm -rf "${appPath}.antigo" "${file}"`,
+        `rm -rf "${appPath}.antigo" "${file}" "${work}"`,
         `open "${appPath}"`,
       ].join('\n'), { mode: 0o755 });
       spawn('/bin/bash', [script], { detached: true, stdio: 'ignore' }).unref();
