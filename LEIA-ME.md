@@ -198,6 +198,10 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 ### Backlog
 
 - **Proxies (edição em baixa resolução):** cópias leves (ex. 540p/720p, H.264 com GOP curto) geradas em segundo plano ao importar ou a pedido; a pré-visualização usa o proxy, o export usa sempre o original. Interruptor "Usar proxies" na barra, indicador por ficheiro (a gerar / pronto), cache em userData/proxies e opção para apagar. Útil em computadores lentos e com vídeo 4K/HEVC (que o Chromium nem sempre pré-visualiza)
+- **Projetos portáteis (mudar de computador):**
+  - Caminhos relativos ao ficheiro do projeto (pasta do projeto + `media/`) — funciona com pen, iCloud, Drive, Dropbox e entre Mac/Windows/Linux
+  - Reencontrar ficheiros em falta ao abrir: escolher pasta, procura por nome + tamanho, um encontrado reencontra os restantes
+  - "Empacotar projeto": copia projeto + ficheiros usados para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
 - Mais transições: direções, formas, desfocar, flash, glitch
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
 - Lottie: animações prontas (.json)
