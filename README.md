@@ -5,7 +5,7 @@
 <p align="center">
   <img src="build/icons/128x128.png" alt="" width="72"><br>
   <b>Editor de vídeo para o computador, simples como deve ser.</b><br>
-  Corta, junta, anima e exporta — com modelos, efeitos, legendas automáticas e gravação de ecrã.
+  Corta, junta, anima e exporta — com modelos, efeitos, música, stickers, legendas automáticas e gravação de ecrã.
 </p>
 
 <p align="center">
@@ -32,9 +32,14 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 **Editar**
 - Timeline com várias pistas de vídeo, áudio e texto; mover, aparar, dividir (`S`, `Q`, `W`), copiar/colar, apagar e fechar espaço
 - Íman, zoom até ao fotograma (também a arrastar na régua), forma de onda real, seleção múltipla, desfazer/refazer
-- Velocidade (0,25× a 4×), fades arrastáveis, separar o áudio, **congelar fotograma**
+- Velocidade (0,25× a 4×), fades arrastáveis, separar o áudio, **congelar fotograma**, **dividir nas mudanças de cena**
 - Enquadramento com o rato (mover, redimensionar, rodar), disposições rápidas (ecrã dividido, imagem dentro de imagem), **keyframes** com curvas IBM
 - Mudar o formato a qualquer momento (16:9, 9:16, 1:1, 4:5…) com **fundo desfocado** para encher as barras
+
+**Som e música**
+- **Música e efeitos sonoros** incluídos (10 músicas, 23 efeitos), criados para o VidCut e livres de direitos
+- **Cortes ao ritmo da música**: batidas detetadas, íman nas batidas e "encaixar clips no ritmo"
+- **Normalizar volume** (−14 LUFS, o nível das redes) e **keyframes de volume** desenhados no próprio clip
 
 **Texto e legendas**
 - Textos com animações de entrada e saída (máquina de escrever, palavra a palavra…), caixa, sombra, **contorno e brilho**
@@ -46,6 +51,7 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 - Animações **Lottie** incluídas e as tuas (`.json` / `.lottie`)
 - **20 efeitos** (tremor, VHS, glitch, fugas de luz, bokeh, neve, ondulação…) com intensidade ajustável
 - 13 **transições** (dissolver, deslizar, chicote, glitch, círculo…)
+- **Stickers e emojis**: 23 stickers com texto editável e ~1500 emojis, com animações em loop
 - Tudo com **pré-visualização no ecrã principal**: um clique mostra, um duplo clique aplica
 
 **Gravar**
@@ -58,6 +64,7 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 
 **E ainda**
 - **Atualizações automáticas** — a app avisa quando há versão nova e instala com um clique
+- Pré-visualização em **ecrã inteiro** (tecla F)
 - Gravação automática contínua; projetos `.vidcut` em JSON
 
 ## Ecrãs
@@ -121,4 +128,4 @@ npm run dev
 
 O VidCut é **código aberto**, com a [licença MIT](LICENSE): podes usar, alterar e distribuir à vontade, desde que mantenhas o aviso de direitos de autor. Sugestões e melhorias são bem-vindas (abre um *issue* ou um *pull request*).
 
-O VidCut usa o [Remotion](https://www.remotion.dev/license), que tem licença própria: gratuito para uso individual e empresas até 3 pessoas; equipas maiores precisam da licença de empresa do Remotion. Os modelos e as animações Lottie incluídos foram criados para o VidCut; alguns modelos foram adaptados dos [templates MIT da React Video Editor](https://github.com/reactvideoeditor/remotion-templates).
+O VidCut usa o [Remotion](https://www.remotion.dev/license), que tem licença própria: gratuito para uso individual e empresas até 3 pessoas; equipas maiores precisam da licença de empresa do Remotion. Os modelos, as animações Lottie, os stickers, as músicas e os efeitos sonoros incluídos foram criados para o VidCut; os emojis são os [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) da Microsoft (MIT); alguns modelos foram adaptados dos [templates MIT da React Video Editor](https://github.com/reactvideoeditor/remotion-templates).

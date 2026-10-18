@@ -2,6 +2,17 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.22.0
+
+- Música e efeitos sonoros (separador Áudio): 10 músicas e 23 efeitos criados para o VidCut, livres de direitos — ouvir, pesquisar e arrastar para a timeline
+- Cortes ao ritmo da música: deteta as batidas (as músicas incluídas já as trazem), mostra-as no clip, o íman encaixa nelas e "Encaixar clips no ritmo" põe os teus vídeos e fotos a mudar na batida (cada batida, 2 ou compasso)
+- Normalizar volume: um clique acerta o som para −14 LUFS (o nível das redes), um clip ou vários de uma vez
+- Keyframes de volume: linha de volume no clip — arrastar, duplo clique para criar pontos e fazer subir ou descer o som
+- Dividir nas mudanças de cena: encontra os cortes dentro de um vídeo e divide-o automaticamente
+- Stickers e emojis (separador Stickers): 23 stickers com texto e cor editáveis e ~1500 emojis com pesquisa em português, com animações em loop (pop, saltar, flutuar, desenhar…)
+- Pré-visualização em ecrã inteiro: botão, tecla F ou duplo clique no ecrã; Esc para sair
+- Biblioteca com 6 separadores numa grelha (Media, Áudio, Modelos, Animações, Efeitos, Stickers)
+
 ## 0.21.1
 
 - Separadores da biblioteca com ícone e nome (Media, Modelos, Animações, Efeitos) — já não ficam cortados; Importar e Gravar passam para uma barra no separador Media

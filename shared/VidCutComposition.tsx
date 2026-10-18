@@ -15,6 +15,8 @@ import { getTemplate } from './templates';
 import { TemplateDurationContext } from './template-api';
 import { fontFaceCss, userFontFamily, type FontAsset } from './userfonts';
 import { combineEffects } from './effects';
+import { volumeAt } from './volume';
+import { StickerArt, stickerMedia } from './stickers';
 
 /** Fontes próprias do projeto: injeta o @font-face e espera que carreguem antes de desenhar */
 const ProjectFonts: React.FC<{ fonts?: Record<string, FontAsset> }> = ({ fonts }) => {
@@ -143,11 +145,11 @@ const VisualClip: React.FC<{
   const src = media ? mediaUrl(base, media.path) : '';
   const tf = animatedTransform(clip, clampFrame(from + local - clip.start, clip.duration));
   look.opacity *= tf.opacity;
-  const vol = track.muted || clip.audioDetached ? 0 : clip.volume;
+  const silent = track.muted || clip.audioDetached || (!clip.volKeys?.length && clip.volume === 0);
   const sp = clipSpeed(clip);
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
   // caixa posicionada/transformada com filtros de cor; a media enche a caixa
-  const box = clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : media, W, H, tf.fit);
+  const box = clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : clip.sticker ? stickerMedia(clip.sticker) : media, W, H, tf.fit);
   const fx = combineEffects(clip.effects, { clipId: clip.id, t: clampFrame(from + local - clip.start, clip.duration), fps, dur: clip.duration, w: box.w, h: box.h, k: H / 1080 });
   const frameBox = (children: React.ReactNode) => {
     const ms = mediaStyle(tf, box);
@@ -183,6 +185,14 @@ const VisualClip: React.FC<{
             </TemplateDurationContext.Provider>
           </Sequence>,
         )}
+      </Layer>
+    );
+  }
+
+  if (clip.sticker) {
+    return (
+      <Layer look={look} id={clip.id}>
+        {frameBox(<StickerArt sticker={clip.sticker} rel={clampFrame(from + local - clip.start, clip.duration)} fps={fps} />)}
       </Layer>
     );
   }
@@ -247,9 +257,9 @@ const VisualClip: React.FC<{
         <OffthreadVideo
           src={src}
           trimBefore={mainTrim > 0 ? mainTrim : undefined}
-          muted={vol === 0}
+          muted={silent}
           playbackRate={sp}
-          volume={(f) => vol * clipLook(clip, act, from + mainFrom + f, H).volume}
+          volume={(f) => (silent ? 0 : volumeAt(clip, mainFrom + f - pre) * clipLook(clip, act, from + mainFrom + f, H).volume)}
           style={fill}
         />
       </Sequence>
@@ -272,7 +282,7 @@ const AudioClip: React.FC<{ clip: Clip; media: MediaItem; track: Track; base: st
       src={mediaUrl(base, media.path)}
       trimBefore={clip.trimStart > 0 ? clip.trimStart : undefined}
       playbackRate={clipSpeed(clip)}
-      volume={(f) => clip.volume * fadeFactor(f, clip.duration, clip.fadeIn, clip.fadeOut)}
+      volume={(f) => volumeAt(clip, f) * fadeFactor(f, clip.duration, clip.fadeIn, clip.fadeOut)}
     />
   );
 };
@@ -290,7 +300,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
           if (clip.duration <= 0) return null;
-          if (!media && !((clip.text || clip.template || clip.lottie) && track.kind !== 'audio')) return null;
+          if (!media && !((clip.text || clip.template || clip.lottie || clip.sticker) && track.kind !== 'audio')) return null;
           if (track.kind === 'audio' && media) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
@@ -299,7 +309,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
             );
           }
           if (track.hidden) return null;
-          if (clip.text || (!media && !clip.template && !clip.lottie)) {
+          if (clip.text || (!media && !clip.template && !clip.lottie && !clip.sticker)) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name="Texto">
                 {clip.text && <TextLayer clip={clip} text={clip.text} />}
@@ -311,7 +321,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
           const post = act.outT?.post ?? 0;
           const from = clip.start - pre;
           return (
-            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media?.name ?? clip.template?.id ?? 'Lottie'}>
+            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media?.name ?? clip.template?.id ?? clip.sticker?.name ?? 'Lottie'}>
               <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} resolveMedia={resolveMedia} lottie={clip.lottie ? project.lotties?.[clip.lottie.assetId] : undefined} />
             </Sequence>
           );

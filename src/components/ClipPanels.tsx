@@ -19,6 +19,11 @@ import { getEffect } from '../../shared/effects';
 import { removeEffect, setEffectIntensity } from '../ops';
 import { CAPTION_STYLES, toSrt } from '../../shared/captions';
 import { api } from '../api';
+import { addVolKey, clearVolKeys, setVolumeAt, clipBeatFrames, updateSticker } from '../ops';
+import { volumeAt, toDb } from '../../shared/volume';
+import { normalizeClips, detectBeats, syncToBeats, splitOnBeats, splitScenes } from '../analysis-ui';
+import { STICKER_ANIMS, getSticker } from '../../shared/stickers';
+import type { StickerAnim } from '../../shared/types';
 
 /** Campos de edição de um clip de texto */
 export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, text }) => {
@@ -616,6 +621,134 @@ export const CaptionSection: React.FC<{ clip: Clip; projectName: string }> = ({ 
         <button className="btn block" onClick={exportSrt}>Exportar legendas (.srt)</button>
       </div>
       <p className="hint">Ao corrigir o texto, os tempos das palavras mantêm-se se o número de palavras for igual; se não, são redistribuídos pela duração do clip.</p>
+    </section>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Volume (com keyframes e normalização), ritmo, cenas e stickers
+// ---------------------------------------------------------------------------
+
+export const VolumeSection: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { state, commit, notify } = useEditor();
+  const frame = useFrame();
+  const rel = Math.min(clip.duration, Math.max(0, frame - clip.start));
+  const inside = frame >= clip.start && frame <= clip.start + clip.duration;
+  const keys = clip.volKeys ?? [];
+  const v = volumeAt(clip, rel);
+  const onKey = keys.some((k) => k.f === Math.round(rel));
+  return (
+    <div className="vol-box">
+      <Row label={keys.length ? 'Volume na agulha' : 'Volume'} hint={`${Math.round(v * 100)}% · ${toDb(v)}`}>
+        <Range min={0} max={2} step={0.01} value={Math.min(2, v)} apply={(x) => (p) => setVolumeAt(p, clip.id, rel, x)} />
+      </Row>
+      <div className="btn-row wrap">
+        <button className={`btn small${onKey ? ' on' : ''}`} disabled={!inside || onKey} title="Cria um ponto de volume na agulha: depois muda o volume noutro ponto para fazer subir ou descer" onClick={() => commit((p) => addVolKey(p, clip.id, rel))}>
+          <Icon name="diamond" size={13} /> {keys.length ? 'Ponto na agulha' : 'Keyframe de volume'}
+        </button>
+        {keys.length > 0 && <button className="btn small" onClick={() => commit((p) => clearVolKeys(p, clip.id, rel))}>Tirar pontos ({keys.length})</button>}
+        <button className="btn small" title="Mede o som e acerta o volume para −14 LUFS (o nível do YouTube, Instagram e TikTok)" onClick={() => { void normalizeClips({ project: state.project, commit, notify }, [clip.id]); }}>
+          <Icon name="normalize" size={13} /> Normalizar
+        </button>
+      </div>
+      <p className="hint">{keys.length
+        ? 'Com pontos, o volume muda ao longo do clip. Arrasta os pontos na linha amarela da timeline; duplo clique cria ou apaga.'
+        : 'Também podes arrastar a linha amarela no clip, na timeline. Duplo clique nela cria um ponto (keyframe).'}</p>
+    </div>
+  );
+};
+
+export const RhythmSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ clip, media }) => {
+  const { state, commit, notify } = useEditor();
+  const ctx = { project: state.project, commit, notify };
+  const beats = clipBeatFrames(state.project, clip).length;
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <section className="section rhythm-box">
+      <div className="section-head"><h3 className="section-title">Ritmo</h3>{media.bpm ? <span className="badge">{Math.round(media.bpm)} BPM</span> : null}</div>
+      {media.beats?.length ? (
+        <>
+          <p className="hint">{beats} batidas neste clip (as marcas na timeline). O íman encaixa nelas.</p>
+          <span className="field-label">Encaixar os clips de vídeo no ritmo</span>
+          <div className="chip-row">
+            <button className="chip" onClick={() => syncToBeats(ctx, state.selection, 1)}>Cada batida</button>
+            <button className="chip" onClick={() => syncToBeats(ctx, state.selection, 2)}>2 batidas</button>
+            <button className="chip" onClick={() => syncToBeats(ctx, state.selection, 4)}>Compasso</button>
+          </div>
+          <p className="hint">Usa os clips selecionados (com Shift) ou, sem seleção, os da pista de vídeo principal.</p>
+          <button className="btn small" disabled={busy} onClick={async () => { setBusy(true); await detectBeats(ctx, clip.id); setBusy(false); }}>Detetar outra vez</button>
+        </>
+      ) : (
+        <>
+          <p className="hint">Encontra as batidas da música para cortar ao ritmo.</p>
+          <button className="btn block" disabled={busy} onClick={async () => { setBusy(true); await detectBeats(ctx, clip.id); setBusy(false); }}>
+            <Icon name="beat" size={16} /> {busy ? 'A ouvir…' : 'Detetar batidas'}
+          </button>
+        </>
+      )}
+    </section>
+  );
+};
+
+export const ScenesButton: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { state, commit, notify } = useEditor();
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <button className="btn block" disabled={busy} title="Procura os cortes dentro do vídeo e divide o clip em cada um" onClick={async () => { setBusy(true); await splitScenes({ project: state.project, commit, notify }, clip.id); setBusy(false); }}>
+      <Icon name="scenes" size={16} /> {busy ? 'A procurar cenas…' : 'Dividir nas mudanças de cena'}
+    </button>
+  );
+};
+
+export const MultiAudioActions: React.FC<{ ids: string[] }> = ({ ids }) => {
+  const { state, commit, notify } = useEditor();
+  const ctx = { project: state.project, commit, notify };
+  return (
+    <div className="btn-col">
+      <button className="btn block" onClick={() => { void normalizeClips(ctx, ids); }} title="Põe todos com volume parecido (−14 LUFS)"><Icon name="normalize" size={16} /> Normalizar volume</button>
+      <span className="field-label">Encaixar no ritmo</span>
+      <div className="chip-row">
+        <button className="chip" onClick={() => syncToBeats(ctx, ids, 1)}>Cada batida</button>
+        <button className="chip" onClick={() => syncToBeats(ctx, ids, 2)}>2 batidas</button>
+        <button className="chip" onClick={() => syncToBeats(ctx, ids, 4)}>Compasso</button>
+      </div>
+      <button className="btn block" onClick={() => splitOnBeats(ctx, ids, 1)}><Icon name="split" size={16} /> Cortar nas batidas</button>
+    </div>
+  );
+};
+
+export const StickerSection: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { commit, dispatch } = useEditor();
+  const s = clip.sticker!;
+  const def = s.svg ? undefined : getSticker(s.id);
+  const set = (patch: Partial<typeof s>) => commit((p) => updateSticker(p, clip.id, patch));
+  return (
+    <section className="section">
+      {def?.text !== undefined && (
+        <Row label="Texto">
+          <textarea
+            rows={2} value={s.text ?? ''}
+            onFocus={() => dispatch({ type: 'beginGesture' })}
+            onBlur={() => dispatch({ type: 'endGesture' })}
+            onChange={(e) => { const text = e.target.value; dispatch({ type: 'gesture', fn: (p) => updateSticker(p, clip.id, { text }) }); }}
+          />
+        </Row>
+      )}
+      {def?.color && (
+        <Row label="Cor">
+          <div className="color-row">
+            <input type="color" value={s.color ?? def.color} onChange={(e) => set({ color: e.target.value })} />
+            <code>{s.color ?? def.color}</code>
+          </div>
+        </Row>
+      )}
+      <span className="field-label">Animação em loop</span>
+      <div className="chip-row">
+        {STICKER_ANIMS.filter((a) => a.value !== 'draw' || !!def).map((a) => (
+          <button key={a.value} className={`chip${s.anim === a.value ? ' on' : ''}`} onClick={() => set({ anim: a.value as StickerAnim })}>{a.label}</button>
+        ))}
+      </div>
+      <p className="hint">Muda o tamanho e a posição com o rato no ecrã. As animações de entrada/saída estão no separador Animação.</p>
     </section>
   );
 };

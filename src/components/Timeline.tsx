@@ -19,6 +19,12 @@ import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
 import { NarrationButton, NarrationPanel } from './Narration';
 import { usePeaks, wavePath } from '../peaks';
+import { addVolKey, allBeatFrames, clipBeatFrames, hasSound, moveVolKey, removeVolKey, addStickerClip } from '../ops';
+import { volumeAt } from '../../shared/volume';
+import { detectBeats, normalizeClips, splitOnBeats, splitScenes, syncToBeats } from '../analysis-ui';
+import { STICKER_DRAG_TYPE, getDraggedSticker } from './StickerLibrary';
+import { SOUND_DRAG_TYPE, getDraggedSound, addLibrarySound } from './SoundLibrary';
+import type { Action } from '../state';
 import { clipSpeed } from '../../shared/types';
 
 const HEADER_W = 156;
@@ -267,7 +273,7 @@ export const Timeline: React.FC = () => {
     }
     if (!selection.includes(clip.id) || selection.length > 1) dispatch({ type: 'select', ids: [clip.id] });
 
-    const points = new Set<number>([0, playhead.frame]);
+    const points = new Set<number>([0, playhead.frame, ...allBeatFrames(projectRef.current)]);
     for (const t of projectRef.current.tracks) for (const c of t.clips) if (c.id !== clip.id) { points.add(c.start); points.add(c.start + c.duration); }
     gesture.current = { mode, origin: clip, originTrackId: track.id, kind: track.kind, x0: e.clientX, started: false, snapPoints: [...points] };
 
@@ -410,7 +416,7 @@ export const Timeline: React.FC = () => {
   /** Arrastar um grupo de clips selecionados (mantém pistas; não salta por cima de outros) */
   const onGroupDown = (e: React.PointerEvent, clip: Clip, ids: string[]) => {
     const set = new Set(ids);
-    const points = new Set<number>([0, playhead.frame]);
+    const points = new Set<number>([0, playhead.frame, ...allBeatFrames(projectRef.current)]);
     for (const t of projectRef.current.tracks) for (const c of t.clips) if (!set.has(c.id)) { points.add(c.start); points.add(c.start + c.duration); }
     const pts = [...points];
     const x0 = e.clientX;
@@ -467,7 +473,7 @@ export const Timeline: React.FC = () => {
   };
 
   // ---------- largar media ----------
-  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
+  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes(STICKER_DRAG_TYPE) || e.dataTransfer.types.includes(SOUND_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
 
   const onDrop = async (e: React.DragEvent, trackId: string | undefined, newTrack = false) => {
     e.preventDefault();
@@ -479,6 +485,21 @@ export const Timeline: React.FC = () => {
     const lottieId = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
     const lottieEntry = lottieId ? getLottieEntry(lottieId) : undefined;
     const effectId = e.dataTransfer.getData(EFFECT_DRAG_TYPE);
+    const sticker = e.dataTransfer.types.includes(STICKER_DRAG_TYPE) ? getDraggedSticker() : null;
+    if (sticker) {
+      const tr = project.tracks.find((t) => t.id === trackId);
+      commit((p) => {
+        const r = addStickerClip(p, sticker, start, { trackId: tr?.kind === 'video' ? trackId : undefined, newTrack, magnet: snap });
+        return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
+      });
+      return;
+    }
+    const sound = e.dataTransfer.types.includes(SOUND_DRAG_TYPE) ? getDraggedSound() : null;
+    if (sound) {
+      const tr = project.tracks.find((t) => t.id === trackId);
+      await addLibrarySound({ commit, notify, mediaBase }, sound, start, tr?.kind === 'audio' ? trackId : undefined);
+      return;
+    }
     if (effectId) {
       // efeito largado em cima de um clip: aplica-se a esse clip
       const tr = project.tracks.find((t) => t.id === trackId);
@@ -595,6 +616,7 @@ export const Timeline: React.FC = () => {
               onClipDown={onClipDown}
               onClipMenu={onClipMenu}
               onKeyframeDown={onKeyframeDown}
+              dispatch={dispatch}
               onSelectTransition={(id) => { playhead.pause(); dispatch({ type: 'select', ids: [transitionSelId(id)] }); }}
               onAddTransition={(clip, prev) => commit((p) => setTransition(p, clip.id, { type: 'dissolve', duration: clamp(Math.round(fps * 0.5), 2, maxTransition(prev, clip)) }), [transitionSelId(clip.id)])}
               onLaneDown={onLaneDown}
@@ -632,11 +654,49 @@ export const Timeline: React.FC = () => {
 
       {menu && (() => {
         const f = findClip(project, menu.clipId);
+        const ctx = { project, commit, notify };
+        const sel = selection.includes(menu.clipId) ? selection : [menu.clipId];
+        const close = (fn: () => void) => (e: React.PointerEvent) => { e.stopPropagation(); fn(); setMenu(null); };
+        const menuExtras = (clip: Clip) => {
+          const m = project.media.find((x) => x.id === clip.mediaId);
+          const sound = hasSound(project, clip.id) || (m?.kind === 'audio');
+          const beats = clipBeatFrames(project, clip).length > 0;
+          const anyBeats = allBeatFrames(project).length > 0;
+          const visual = !!findClip(project, clip.id) && findClip(project, clip.id)!.track.kind === 'video';
+          return (
+            <>
+              {(sound || m?.kind === 'video') && <div className="ctx-sep" />}
+              {sound && (
+                <button role="menuitem" onPointerDown={close(() => { void normalizeClips(ctx, sel); })}>
+                  <Icon name="volume" size={15} /> Normalizar volume{sel.length > 1 ? ` (${sel.length})` : ''}
+                </button>
+              )}
+              {m && m.kind !== 'image' && (
+                <button role="menuitem" onPointerDown={close(() => { void detectBeats(ctx, clip.id); })}>
+                  <Icon name="beat" size={15} /> {beats ? 'Detetar batidas outra vez' : 'Detetar batidas'}
+                </button>
+              )}
+              {anyBeats && (
+                <>
+                  <button role="menuitem" onPointerDown={close(() => syncToBeats(ctx, sel, 1))}><Icon name="beat" size={15} /> Encaixar clips no ritmo · 1 batida</button>
+                  <button role="menuitem" onPointerDown={close(() => syncToBeats(ctx, sel, 2))}><Icon name="beat" size={15} /> Encaixar clips no ritmo · 2 batidas</button>
+                  <button role="menuitem" onPointerDown={close(() => syncToBeats(ctx, sel, 4))}><Icon name="beat" size={15} /> Encaixar clips no ritmo · 1 compasso</button>
+                  {visual && <button role="menuitem" onPointerDown={close(() => splitOnBeats(ctx, sel, 1))}><Icon name="split" size={15} /> Cortar nas batidas</button>}
+                </>
+              )}
+              {m?.kind === 'video' && visual && (
+                <button role="menuitem" onPointerDown={close(() => { void splitScenes(ctx, clip.id); })}>
+                  <Icon name="scenes" size={15} /> Dividir nas mudanças de cena
+                </button>
+              )}
+            </>
+          );
+        };
         if (!f) return null;
         const under = playhead.frame > f.clip.start && playhead.frame < f.clip.start + f.clip.duration;
         const run = (fn: () => void) => (e: React.PointerEvent) => { e.stopPropagation(); fn(); setMenu(null); };
         return (
-          <div className="ctx-menu" style={{ left: Math.min(menu.x, window.innerWidth - 256), top: Math.min(menu.y, window.innerHeight - 150) }} onPointerDown={(e) => e.stopPropagation()} role="menu">
+          <div className="ctx-menu" style={{ left: Math.min(menu.x, window.innerWidth - 296), top: Math.max(8, Math.min(menu.y, window.innerHeight - 520)) }} onPointerDown={(e) => e.stopPropagation()} role="menu">
             <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = splitAtPlayhead(project, [menu.clipId]); if (r) commit(() => r); })}>
               <Icon name="split" size={15} /> Dividir na cabeça de leitura <kbd>S</kbd>
             </button>
@@ -666,6 +726,7 @@ export const Timeline: React.FC = () => {
                 <Icon name="captions" size={15} /> Gerar legendas…
               </button>
             )}
+            {menuExtras(f.clip)}
             <div className="ctx-sep" />
             <button role="menuitem" onPointerDown={run(() => commit((p) => rippleDelete(p, selection.includes(menu.clipId) ? selection : [menu.clipId]), []))}>
               <Icon name="trash" size={15} /> Apagar e fechar espaço <kbd>⇧Del</kbd>
@@ -718,6 +779,7 @@ interface TrackRowProps {
   onClipDown: (e: React.PointerEvent, clip: Clip, track: Track, mode: ClipMode) => void;
   onClipMenu: (e: React.MouseEvent, clip: Clip) => void;
   onKeyframeDown: (e: React.PointerEvent, clip: Clip, kf: Keyframe) => void;
+  dispatch: React.Dispatch<Action>;
   onSelectTransition: (clipId: string) => void;
   onAddTransition: (clip: Clip, prev: Clip) => void;
   onLaneDown: (e: React.PointerEvent) => void;
@@ -726,7 +788,7 @@ interface TrackRowProps {
   onRemove: () => void;
 }
 
-const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onKeyframeDown, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
+const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dropActive, onClipDown, onClipMenu, onKeyframeDown, dispatch, onSelectTransition, onAddTransition, onLaneDown, dragProps, onToggle, onRemove, project }) => {
   const isVideo = track.kind === 'video';
   const isText = track.kind === 'text';
   return (
@@ -766,6 +828,10 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
               onDown={(e, mode) => onClipDown(e, clip, track, mode)}
               onMenu={(e) => onClipMenu(e, clip)}
               onKeyframeDown={(e, kf) => onKeyframeDown(e, clip, kf)}
+              sound={hasSound(project, clip.id)}
+              beats={clipBeatFrames(project, clip)}
+              dispatch={dispatch}
+              height={TRACK_H[track.kind]}
             />
           );
         })}
@@ -819,16 +885,20 @@ const ClipView: React.FC<{
   onDown: (e: React.PointerEvent, mode: ClipMode) => void;
   onMenu: (e: React.MouseEvent) => void;
   onKeyframeDown: (e: React.PointerEvent, kf: Keyframe) => void;
-}> = React.memo(({ clip, media, lottieName, trackKind, z, fps, selected, onDown, onMenu, onKeyframeDown }) => {
+  sound: boolean;
+  beats: number[];
+  dispatch: React.Dispatch<Action>;
+  height: number;
+}> = React.memo(({ clip, media, lottieName, trackKind, z, fps, selected, onDown, onMenu, onKeyframeDown, sound, beats, dispatch, height }) => {
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
-  const kind = clip.text ? 'text' : clip.template ? 'template' : clip.lottie ? 'lottie' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
+  const kind = clip.text ? 'text' : clip.template ? 'template' : clip.lottie ? 'lottie' : clip.sticker ? 'sticker' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
     <div
-      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template || (clip.lottie && lottieName) ? '' : ' missing'}`}
+      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template || clip.sticker || (clip.lottie && lottieName) ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       data-clip-id={clip.id}
       onPointerDown={(e) => onDown(e, 'move')}
@@ -842,9 +912,9 @@ const ClipView: React.FC<{
           {fo > 0 && <polygon points={`${w},0 ${w - fo},0 ${w},100`} />}
         </svg>
       )}
-      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : media?.name ?? 'Ficheiro em falta'}</span>}
+      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : clip.sticker ? `☺ ${clip.sticker.name}` : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
-      {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
+      {sound && (clip.volume !== 1 || clip.volKeys?.length) && w > 80 && <span className="clip-badge">{clip.volKeys?.length ? '◆ vol' : `${Math.round(clip.volume * 100)}%`}</span>}
       {clip.effects?.length && w > 70 ? <span className="clip-badge fx" title={clip.effects.map((x) => getEffect(x.id)?.name ?? x.id).join(', ')}>fx{clip.effects.length > 1 ? ` ${clip.effects.length}` : ''}</span> : null}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}
       {clip.keyframes?.map((kf) => (
@@ -856,6 +926,12 @@ const ClipView: React.FC<{
           title="Keyframe: clica para ir até ele, arrasta para o mover"
         />
       ))}
+      {beats.length > 0 && w > 20 && (
+        <svg className="clip-beats" width={w} height="100%" aria-hidden>
+          {beats.map((f, i) => { const x = (f - clip.start) * z; return x > 1 && x < w - 1 ? <line key={i} x1={x} x2={x} y1="0" y2="100%" /> : null; })}
+        </svg>
+      )}
+      {sound && (selected || !!clip.volKeys?.length) && w > 24 && <VolumeEnvelope clip={clip} w={w} h={height - 2} z={z} active={selected} dispatch={dispatch} />}
       <div className="clip-handle left" onPointerDown={(e) => onDown(e, 'left')} />
       <div className="clip-handle right" onPointerDown={(e) => onDown(e, 'right')} />
       {w > 40 && !clip.text && (
@@ -890,6 +966,53 @@ const ClipWave: React.FC<{ clip: Clip; path?: string; fps: number; width: number
   return (
     <svg className={`clip-wave-svg${full ? ' full' : ' strip'}`} viewBox={`0 0 ${Math.max(1, wave.n - 1)} 100`} preserveAspectRatio="none" aria-hidden>
       <path d={wave.d} />
+    </svg>
+  );
+};
+
+/** Linha de volume por cima do clip: arrastar a linha muda o volume; duplo clique cria um keyframe; arrastar/duplo clique num ponto move/apaga */
+const VOL_TOP = 2; // a linha vai de 0 (em baixo) a 200% (em cima); 100% fica a meio
+const VolumeEnvelope: React.FC<{ clip: Clip; w: number; h: number; z: number; active: boolean; dispatch: React.Dispatch<Action> }> = ({ clip, w, h, z, active, dispatch }) => {
+  const pad = 7;
+  const yOf = (v: number) => pad + (1 - Math.min(VOL_TOP, v) / VOL_TOP) * (h - 2 * pad);
+  const vOf = (y: number) => clamp((1 - (y - pad) / (h - 2 * pad)) * VOL_TOP, 0, VOL_TOP);
+  const keys = clip.volKeys ?? [];
+  const pts = keys.length
+    ? [{ x: 0, y: yOf(volumeAt(clip, 0)) }, ...keys.map((k) => ({ x: clamp(k.f * z, 0, w), y: yOf(k.v) })), { x: w, y: yOf(volumeAt(clip, clip.duration)) }]
+    : [{ x: 0, y: yOf(clip.volume) }, { x: w, y: yOf(clip.volume) }];
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const local = (e: { clientX: number; clientY: number }, el: Element) => { const r = el.closest('svg')!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const drag = (e: React.PointerEvent, onMove: (x: number, y: number) => void) => {
+    if (e.button !== 0 || !active) return;
+    e.stopPropagation(); e.preventDefault();
+    const svg = (e.currentTarget as Element).closest('svg')!;
+    let started = false;
+    const x0 = e.clientX, y0 = e.clientY;
+    const move = (ev: PointerEvent) => {
+      if (!started) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 3) return; started = true; dispatch({ type: 'beginGesture' }); document.body.classList.add('vol-dragging'); }
+      const p = local(ev, svg); onMove(p.x, p.y);
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('vol-dragging'); if (started) dispatch({ type: 'endGesture' }); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const label = (v: number) => `${Math.round(v * 100)}%`;
+  return (
+    <svg className={`clip-vol${active ? ' active' : ''}`} width={w} height={h} aria-label="Volume">
+      <path className="clip-vol-hit" d={d}
+        onPointerDown={(e) => { if (!keys.length) drag(e, (_x, y) => dispatch({ type: 'gesture', fn: (p) => updateClip(p, clip.id, { volume: Math.round(vOf(y) * 100) / 100 }) })); else if (active) e.stopPropagation(); }}
+        onDoubleClick={(e) => { e.stopPropagation(); const p = local(e, e.currentTarget); dispatch({ type: 'gesture', fn: (q) => addVolKey(q, clip.id, p.x / z, Math.round(vOf(p.y) * 100) / 100) }); }}
+      >
+        <title>{keys.length ? 'Duplo clique: novo ponto de volume' : `Volume ${label(clip.volume)} — arrasta para cima/baixo · duplo clique cria um ponto (keyframe)`}</title>
+      </path>
+      <path className="clip-vol-line" d={d} />
+      {keys.map((k, i) => (
+        <circle key={i} className="clip-vol-pt" cx={clamp(k.f * z, 0, w)} cy={yOf(k.v)} r={4.5}
+          onPointerDown={(e) => drag(e, (x, y) => dispatch({ type: 'gesture', fn: (p) => moveVolKey(p, clip.id, i, x / z, Math.round(vOf(y) * 100) / 100) }))}
+          onDoubleClick={(e) => { e.stopPropagation(); dispatch({ type: 'gesture', fn: (q) => removeVolKey(q, clip.id, i) }); }}
+        >
+          <title>{`${label(k.v)} — arrasta para mudar · duplo clique apaga`}</title>
+        </circle>
+      ))}
     </svg>
   );
 };

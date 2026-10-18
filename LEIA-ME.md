@@ -22,7 +22,7 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - **Separar áudio** de um clip de vídeo (botão direito no clip, ou no painel da direita): o som passa para uma pista de áudio, alinhado ao frame, e pode ser movido, cortado e ter volume e fades próprios. "Voltar a juntar o áudio" desfaz a separação
 - Fade in / fade out por clip: no vídeo afeta imagem e som, no áudio afeta o volume. Ajusta-se no painel ou a arrastar as bolinhas no canto superior de cada clip (esquerda: fade in, direita: fade out)
 - **Transições** entre clips encostados na mesma pista de vídeo: passa o rato na junção e carrega no **+**. Tipos: Dissolver, Fundido a preto, Deslizar, Empurrar, Cortina, Zoom, Desfocar, Flash, Glitch, Círculo, Losango, Persianas e Chicote (whip pan); Deslizar, Empurrar, Cortina, Persianas e Chicote têm direção (← → ↑ ↓). O Glitch é determinístico (pré-visualização = export). Duração com presets IBM (Rápida 240 ms, Média 400 ms, Lenta 700 ms, 1 s) e curva IBM expressiva. A transição fica centrada no corte; se um clip não tiver imagem extra para lá do corte, o primeiro/último frame fica parado durante a transição. Seleciona o bloco da transição para mudar ou apagar (`Delete`)
-- Volume por clip (0–200 %), silenciar e esconder pistas
+- Volume por clip (0–200 %, até 400 % ao normalizar), silenciar e esconder pistas
 - **Enquadramento** de vídeos e imagens: posição, escala, rotação (com ±90°), espelhar, ajuste (caber inteiro / preencher), opacidade e recorte. Na pré-visualização, o clip selecionado mostra uma caixa: arrastar para mover (encaixa no centro e nos terços), cantos para redimensionar, pega de cima para rodar (`Shift`: de 15 em 15°). Disposições rápidas: inteiro, preencher, metades (esquerda/direita/cima/baixo, para ecrã dividido) e picture-in-picture nos 4 cantos
 - **Velocidade** de vídeos e áudio (0,25× a 4×, slider ou 0,5× / 1× / 1,5× / 2× / 3×): mantém o mesmo excerto, o clip encolhe/estica e os clips seguintes da pista acompanham. Na timeline aparece "2×"
 - **Cor e efeitos** (vídeo e imagem): brilho, contraste, saturação, temperatura (frio ↔ quente), desfocar, vinheta e sépia, com filtros prontos (Vívido, Quente, Frio, P&B, Sépia, Desbotado, Cinema, Vintage)
@@ -63,6 +63,14 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Biblioteca de efeitos:** separador **Efeitos** no painel da esquerda, 20 efeitos com miniaturas que animam ao passar o rato: Movimento (Tremor, Câmara na mão, Pulsar, Batida, Zoom lento, Balançar), Luz (Brilho suave, Fugas de luz, Reflexo a passar, Arco-íris, Estroboscópio), Retro (VHS, Película antiga, Glitch, Duotone), Partículas (Neve, Brilhos, Bokeh) e Distorção (Ondulação, Foco a pulsar). Clique mostra o efeito no clip selecionado (ou no de cima na agulha) no ecrã principal; duplo clique, arrastar para um clip na timeline ou largar no ecrã aplica. Vários efeitos por clip (vídeo, imagem, modelo, animação), cada um com intensidade, no separador **Cor · Fx**; na timeline os clips com efeitos têm a etiqueta "fx". Os efeitos são funções do tempo (sem aleatório ao vivo): a pré-visualização é igual ao export
 - **Gravar ecrã e câmara:** botão Gravar no separador Media. Escolhe o ecrã inteiro ou uma janela (miniaturas), liga a câmara (pré-visualização ao vivo, escolha da câmara) e o microfone (medidor de nível); no Windows também o som do computador. Conta 3 s e grava; com "Esconder o VidCut a gravar" a janela minimiza e fica uma barrinha com o tempo e **Parar** por cima de tudo (não aparece na gravação) — ou o atalho ⌘⇧2 / Ctrl+Shift+2. Grava ficheiros separados (ecrã com o som do microfone; câmara sem som) em `gravacoes/` na pasta de dados e põe-nos na agulha: o ecrã numa pista por cima do que lá estiver e a câmara numa pista nova, no canto inferior direito. No Mac, a primeira vez é preciso autorizar a Gravação de ecrã (e a câmara) nas Definições do Sistema e voltar a abrir a app; como a app não tem certificado da Apple, depois de uma atualização o Mac pode voltar a pedir esta autorização
+
+- **Normalizar volume:** botão "Normalizar" no volume do clip, botão direito → "Normalizar volume", ou vários clips selecionados → "Normalizar volume". Mede a sonoridade do excerto usado (EBU R128, filtro loudnorm do ffmpeg) e acerta o volume para −14 LUFS — o nível do YouTube, Instagram e TikTok — sem deixar o pico passar de −1 dB. Com vários clips ficam todos com volume parecido
+- **Keyframes de volume:** com um clip com som selecionado aparece uma linha amarela por cima (100% a meio): arrastá-la para cima/baixo muda o volume; duplo clique cria um ponto; os pontos arrastam-se (tempo e volume) e duplo clique apaga. No painel: "Keyframe de volume" / "Ponto na agulha", e com pontos o slider mexe no volume do ponto da agulha (como no CapCut). Interpolação linear; os pontos acompanham ao dividir, aparar, mudar velocidade e separar o áudio. Na timeline aparece "◆ vol"
+- **Música e efeitos sonoros:** separador **Áudio**: 10 músicas (lo-fi, pop, empresa, ambiente, hip-hop, eletrónica, épico, acústica, suspense, funk; 54–75 s) e 23 efeitos (whoosh, riser, impacto, glitch, pop, bolhas, clique, ding, notificação, sucesso, erro, moeda, caixa registadora, zap, teclado, fotografia, tique-taque, coração, ta-dá, aplausos, ba-dum-tss). Ouvir com ▶, duplo clique ou arrastar para a timeline, pesquisa por nome/estilo. Tudo sintetizado de raiz para o VidCut (`scripts/gerar-sons.py`), livre de direitos, também para uso comercial. Ao usar, o som é copiado para `sons/` na pasta de dados; as músicas já trazem o andamento e as batidas exatas
+- **Cortes ao ritmo da música:** botão direito num clip com som → "Detetar batidas" (ou no painel, secção Ritmo). Encontra o andamento e as batidas (força dos ataques por bandas → autocorrelação → programação dinâmica), em cache. As batidas aparecem como tracejado no clip e o íman encaixa nelas. "Encaixar clips no ritmo" (cada batida, 2 batidas ou compasso) põe os clips de vídeo/imagem seguidos, cada um a começar numa batida — os selecionados ou, sem seleção, os da pista com mais vídeos; vídeos curtos acabam na batida mais distante que alcançam. "Cortar nas batidas" divide os clips de vídeo selecionados em cada batida
+- **Deteção de cenas:** num clip de vídeo, "Dividir nas mudanças de cena" (painel ou botão direito): procura os cortes dentro do vídeo (diferença de imagem e de histograma, fotograma a fotograma) e divide o clip em cada um. Ideal para vídeos já montados ou gravações longas
+- **Stickers e emojis:** separador **Stickers**: 23 stickers desenhados para o VidCut (balões de fala e pensamento, explosão "NOVO!", etiqueta, carimbo, faixa, setas e círculos desenhados à mão, sublinhado, visto, cruz, raio, brilhos, Subscrever, Gosto, Em direto, Segue-me, cursor, corações, estrelas, exclamação, "Uau!") com texto e cor editáveis, e ~1500 emojis Fluent (Microsoft, licença MIT) com pesquisa em português. Duplo clique, arrastar para a timeline ou largar no ecrã (fica onde o largaste). Animações em loop: Pop, Saltar, Flutuar, Pulsar, Coração, Abanar, Baloiçar, Tremer, Rodar e Desenhar (o traço desenha-se). Comportam-se como imagens: enquadrar com o rato, cor, efeitos, keyframes, animações de entrada/saída
+- **Pré-visualização em ecrã inteiro:** botão no canto da barra por baixo do ecrã, tecla `F` ou duplo clique no ecrã; os controlos escondem-se quando o rato fica parado a reproduzir. `Esc` ou `F` para sair
 
 - **Atualizações automáticas:** na app instalada, procura versões novas nas Releases do GitHub uns segundos depois de abrir (no máximo uma vez por dia) e em **Ajuda → Procurar atualizações** (no Mac também em VidCut → Procurar atualizações). Aviso no canto com as novidades: **Atualizar** descarrega (com progresso e verificação de tamanho/SHA-256), **Reiniciar e instalar** fecha, substitui e volta a abrir; o projeto aberto fica na gravação automática. "Saltar esta versão" deixa de avisar dessa versão
   - macOS: descarrega o `.zip` e substitui a VidCut.app (funciona sem certificado Apple; a app tem de estar numa pasta onde possas escrever, ex.: Aplicações)
@@ -174,11 +182,14 @@ electron/
   preload.cjs        ponte segura window.vidcut
   media-server.cjs   servidor HTTP local (127.0.0.1) que serve só os ficheiros importados
   render.cjs         export com @remotion/renderer (corre também fora do Electron)
+  audio-analysis.cjs sonoridade (normalizar), batidas e mudanças de cena com o ffmpeg
 shared/
   types.ts           modelo de dados do projeto
   motion.ts          tokens de animação IBM/Carbon (curvas, durações) + fades
   VidCutComposition.tsx  composição Remotion: a MESMA para pré-visualização e export
   remotion-root.tsx  entrada do bundle de export
+  volume.ts          volume ao longo do clip (keyframes de volume)
+  stickers.tsx       stickers desenhados, emojis e as suas animações
 src/                 interface React
   App.tsx            estado global, atalhos, ficheiros, export
   state.ts           reducer com histórico (desfazer/refazer)
@@ -190,6 +201,9 @@ scripts/
   bundle-remotion.mjs   gera remotion-bundle/ (pré-compilado, usado no export)
   make-test-media.sh    cria ficheiros de teste em test-media/ (precisa de ffmpeg)
   test-render.cjs       export de teste sem Electron
+  gerar-sons.py         sintetiza as músicas e os efeitos sonoros em sons/ (numpy, scipy, ffmpeg)
+  gerar-emojis.mjs      gera src/stickers/emoji-data.json (emojis Fluent + nomes em português)
+sons/                 músicas e efeitos incluídos na app (+ sons.json com andamento e batidas)
 ```
 
 ## Modelo de dados
@@ -242,7 +256,6 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export
 - **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada
 - **Marcadores na timeline:** tecla M adiciona um marcador com nome e cor na régua; saltar entre marcadores; o íman encosta clips aos marcadores
-- **Pré-visualização em ecrã inteiro:** botão e tecla F para ver o vídeo a tocar em ecrã inteiro, sem a interface (Esc para sair)
 - **Sincronizar pelo som (sound sync):** para quem grava imagem e som em separado (câmara + microfone externo/gravador, ou várias câmaras). Seleciona o vídeo e o áudio → botão direito → "Sincronizar pelo som": o VidCut compara o som da câmara com o do gravador e encosta o áudio no sítio certo, ao fotograma
   - Como: extrair os dois sons com o ffmpeg (mono, 8 kHz — já o fazemos para as formas de onda), calcular a curva de energia/ataques de cada um e procurar o desfasamento com correlação cruzada (FFT, método GCC-PHAT, robusto a volumes e microfones diferentes), numa janela de ±2 min; refinar à amostra no fim
   - Confiança: mostrar o resultado ("desfasamento 3,42 s · confiança alta"); se for baixa (som da câmara muito fraco ou sem partes em comum), avisar e sugerir bater palmas no início da próxima gravação

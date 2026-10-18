@@ -30,6 +30,8 @@ export interface UpdateStatus {
   message?: string;
 }
 
+export interface LibSound { id: string; name: string; file: string; preview: string; durationSec: number; bpm?: number; beats?: number[]; tags: string[]; category?: string }
+
 export interface VidCutApi {
   info(): Promise<{ mediaBase: string; platform: string; version: string }>;
   pickMedia(): Promise<string[]>;
@@ -42,6 +44,8 @@ export interface VidCutApi {
   exportVideo(project: Project, spec: RenderSpec): Promise<{ ok: boolean; path?: string; error?: string; canceled?: boolean }>;
   cancelExport(): Promise<boolean>;
   showItem(p: string): Promise<boolean>;
+  setFullScreen(on: boolean): Promise<boolean>;
+  onFullScreen(cb: (on: boolean) => void): () => void;
   peaks(file: string): Promise<Uint8Array>;
   nativeEdit(action: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'): Promise<boolean>;
   captionsStatus(): Promise<CaptionsStatus>;
@@ -69,6 +73,11 @@ export interface VidCutApi {
   saveRecording(bytes: ArrayBuffer, mime: string): Promise<{ path: string }>;
   extractFrame(file: string, timeSec: number): Promise<{ path?: string; error?: string }>;
   fontsImport(): Promise<{ name: string; file: string; size: number; data: string }[]>;
+  loudness(file: string, start: number, dur: number): Promise<{ lufs: number; peakDb: number; error?: string }>;
+  beats(file: string): Promise<{ bpm: number; beats: number[]; error?: string }>;
+  scenes(o: { file: string; start: number; dur: number; fps: number; sensitivity: number }): Promise<{ cuts: number[]; frames: number; error?: string }>;
+  soundsList(): Promise<{ musicas: LibSound[]; efeitos: LibSound[] }>;
+  soundsUse(file: string): Promise<{ path?: string; error?: string }>;
   updateCheck(): Promise<void>;
   updateDownload(): Promise<void>;
   updateCancel(): Promise<void>;

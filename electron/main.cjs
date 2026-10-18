@@ -9,6 +9,8 @@ const { createLottieLibrary } = require('./lottie-lib.cjs');
 const { transcribeMedia, captionsStatus } = require('./captions.cjs');
 const { createUpdater } = require('./updater.cjs');
 const { setupScreenRecording } = require('./screen-rec.cjs');
+const analysis = require('./audio-analysis.cjs');
+analysis.setFfmpeg(ffmpegPath);
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -72,6 +74,7 @@ function createWindow() {
   } else {
     win.loadFile(path.join(appRoot, 'dist', 'index.html'));
   }
+  win.on('leave-full-screen', () => win?.webContents.send('win:fullscreen', false));
   // Links externos abrem no browser do sistema
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
@@ -297,6 +300,7 @@ ipcMain.handle('edit:native', (_e, action) => {
   return true;
 });
 
+ipcMain.handle('win:fullscreen', (_e, on) => { if (win && win.isFullScreen() !== !!on) win.setFullScreen(!!on); return true; });
 ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
 
 // ---------- Congelar imagem: extrai um fotograma para PNG ----------
@@ -367,6 +371,49 @@ ipcMain.handle('fonts:import', async () => {
     out.push({ name: path.basename(f).replace(/\.[^.]+$/, ''), file: path.basename(f), size: buf.length, data: buf.toString('base64') });
   }
   return out;
+});
+
+// ---------- Análise: volume, batidas e cenas ----------
+const okFile = (f) => typeof f === 'string' && require('node:fs').existsSync(f);
+ipcMain.handle('audio:loudness', async (_e, { file, start, dur }) => {
+  if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
+  try { return await analysis.loudness(file, Math.max(0, Number(start) || 0), Math.max(0, Number(dur) || 0)); }
+  catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+ipcMain.handle('audio:beats', async (_e, file) => {
+  if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
+  try { return await analysis.detectBeats(file, path.join(app.getPath('userData'), 'batidas')); }
+  catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+ipcMain.handle('video:scenes', async (_e, { file, start, dur, fps, sensitivity }) => {
+  if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
+  try { return await analysis.detectScenes(file, { start: Math.max(0, Number(start) || 0), dur: Math.max(0, Number(dur) || 0), fps: Math.min(60, Math.max(5, Number(fps) || 30)), sensitivity: Number(sensitivity ?? 0.5) }); }
+  catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+
+// ---------- Biblioteca de músicas e efeitos sonoros (sons/, incluída na app) ----------
+const soundsDir = () => path.join(appRoot, 'sons').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1');
+ipcMain.handle('sounds:list', async () => {
+  try {
+    const man = JSON.parse(await fs.readFile(path.join(soundsDir(), 'sons.json'), 'utf8'));
+    const files = [...man.musicas, ...man.efeitos].map((m) => path.join(soundsDir(), m.file));
+    mediaServer.register(files); // para ouvir antes de usar
+    const withPath = (m) => ({ ...m, preview: path.join(soundsDir(), m.file) });
+    return { musicas: man.musicas.map(withPath), efeitos: man.efeitos.map(withPath) };
+  } catch { return { musicas: [], efeitos: [] }; }
+});
+/** Copia o som para a pasta de dados (o caminho da app muda: AppImage, atualizações) e devolve esse caminho */
+ipcMain.handle('sounds:use', async (_e, file) => {
+  const name = path.basename(String(file || ''));
+  const src = path.join(soundsDir(), name);
+  if (!/^[\w\-À-ÿ.]+\.mp3$/.test(name) || !okFile(src)) return { error: 'Som não encontrado.' };
+  const dir = path.join(app.getPath('userData'), 'sons');
+  await fs.mkdir(dir, { recursive: true });
+  const out = path.join(dir, name);
+  const [a, b] = await Promise.all([fs.stat(src), fs.stat(out).catch(() => null)]);
+  if (!b || b.size !== a.size) await fs.copyFile(src, out);
+  mediaServer.register([out]);
+  return { path: out };
 });
 
 // ---------- Atualizações ----------

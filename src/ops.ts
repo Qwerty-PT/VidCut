@@ -11,6 +11,7 @@ import { applyTheme, supportsThemes, templateDefaults } from '../shared/template
 import { defaultTextAnims } from '../shared/anim';
 import { sourceFrames } from '../shared/types';
 import { uid } from './util';
+import { VOL_MAX, scaleVolKeys, shiftVolKeys, sortVol, volumeAt } from '../shared/volume';
 
 export const IMAGE_DEFAULT_SEC = 5;
 
@@ -183,7 +184,7 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const found = findClip(p, origin.id);
   if (!found) return p;
   const media = p.media.find((m) => m.id === origin.mediaId);
-  if (!media && !origin.text && !origin.template) return p;
+  if (!media && !origin.text && !origin.template && !origin.sticker && !origin.lottie) return p;
   const src = media ? sourceFrames(media, p.fps) : Infinity; // texto/modelo: sem limite, como imagens
   const others = found.track.clips.filter((c) => c.id !== origin.id);
   const isImage = !Number.isFinite(src);
@@ -210,8 +211,9 @@ export function trimClip(p: Project, origin: Clip, edge: 'left' | 'right', delta
   const fadeIn = Math.min(origin.fadeIn, duration);
   const fadeOut = Math.min(origin.fadeOut, duration);
   const keyframes = edge === 'left' ? shiftKeyframes(origin.keyframes, origin.start - start) : origin.keyframes;
+  const volKeys = origin.volKeys ? shiftVolKeys(origin.volKeys, origin.start - start, duration, origin) : undefined;
   const cap = origin.caption ? sliceCaption(origin, start - origin.start, start - origin.start + duration) : {};
-  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut, keyframes, ...cap });
+  return updateClip(p, origin.id, { start, duration, trimStart, fadeIn, fadeOut, keyframes, ...(origin.volKeys ? { volKeys } : {}), ...cap });
 }
 
 export function updateClip(p: Project, clipId: string, patch: Partial<Clip>): Project {
@@ -256,13 +258,14 @@ export function splitClips(p: Project, ids: string[], frame: number): { project:
     for (const c of t.clips) {
       if (set.has(c.id) && frame > c.start && frame < c.start + c.duration) {
         const leftDur = frame - c.start;
-        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur), ...sliceCaption(c, 0, leftDur) };
+        const left: Clip = { ...c, duration: leftDur, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftDur), ...sliceCaption(c, 0, leftDur), ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, 0, leftDur, c) } : {}) };
         const right: Clip = {
           ...c,
           id: uid('c'),
           detachedAudioId: undefined,
           transition: undefined,
           keyframes: shiftKeyframes(c.keyframes, -leftDur),
+          ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, -leftDur, c.duration - leftDur, c) } : {}),
           start: frame,
           duration: c.duration - leftDur,
           trimStart: Math.round(c.trimStart + leftDur * clipSpeed(c)),
@@ -301,6 +304,7 @@ export function changeFps(p: Project, fps: number): Project {
         ...(c.animIn ? { animIn: { ...c.animIn, duration: Math.max(1, r(c.animIn.duration)) } } : {}),
         ...(c.animOut ? { animOut: { ...c.animOut, duration: Math.max(1, r(c.animOut.duration)) } } : {}),
         ...(c.keyframes ? { keyframes: c.keyframes.map((kf) => ({ ...kf, frame: r(kf.frame) })) } : {}),
+        ...(c.volKeys ? { volKeys: c.volKeys.map((v) => ({ ...v, f: r(v.f) })) } : {}),
       })),
     })),
   };
@@ -335,6 +339,7 @@ export function detachAudio(p: Project, clipId: string): { project: Project; cli
     trimStart: clip.trimStart,
     speed: clip.speed,
     volume: clip.volume,
+    volKeys: clip.volKeys,
     fadeIn: clip.fadeIn,
     fadeOut: clip.fadeOut,
   };
@@ -377,6 +382,7 @@ export function cutAtFrame(p: Project, ids: string[], frame: number, side: 'left
             duration,
             trimStart: side === 'left' && !isImage ? Math.round(c.trimStart + removed * clipSpeed(c)) : c.trimStart,
             keyframes: side === 'left' ? shiftKeyframes(c.keyframes, -removed) : c.keyframes,
+            ...(c.volKeys ? { volKeys: shiftVolKeys(c.volKeys, side === 'left' ? -removed : 0, duration, c) } : {}),
             fadeIn: Math.min(side === 'left' ? 0 : c.fadeIn, duration),
             fadeOut: Math.min(side === 'right' ? 0 : c.fadeOut, duration),
           };
@@ -513,7 +519,7 @@ export function setSpeed(p: Project, clipId: string, speed: number): Project {
         ...t,
         clips: t.clips.map((c) => {
           if (c.id === clipId) {
-            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration), keyframes: scaleKeyframes(c.keyframes, old / sp) };
+            return { ...c, speed: sp === 1 ? undefined : sp, duration, fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration), keyframes: scaleKeyframes(c.keyframes, old / sp), ...(c.volKeys ? { volKeys: scaleVolKeys(c.volKeys, old / sp) } : {}) };
           }
           return c.start >= end0 ? { ...c, start: Math.max(0, c.start + delta) } : c;
         }),
@@ -872,7 +878,7 @@ export function addAudioAt(p: Project, mediaId: string, start: number): { projec
 export function acceptsEffects(p: Project, clipId: string): boolean {
   const f = findClip(p, clipId);
   if (!f || f.track.kind === 'audio' || f.clip.text) return false;
-  if (f.clip.template || f.clip.lottie) return true;
+  if (f.clip.template || f.clip.lottie || f.clip.sticker) return true;
   const m = p.media.find((x) => x.id === f.clip.mediaId);
   return !!m && (m.kind === 'video' || m.kind === 'image');
 }
@@ -942,4 +948,245 @@ export function placeRecording(p: Project, at: number, screenId: string | null, 
     if (id) select.push(id);
   }
   return { project, select };
+}
+
+// ---------- volume: keyframes e normalização ----------
+const clampVol = (v: number) => Math.min(VOL_MAX, Math.max(0, Math.round(v * 1000) / 1000));
+
+/** O clip tem som? (áudio, ou vídeo com som que não foi separado) */
+export function hasSound(p: Project, clipId: string): boolean {
+  const f = findClip(p, clipId);
+  if (!f || f.clip.text || f.clip.template || f.clip.lottie || f.clip.sticker) return false;
+  const m = p.media.find((x) => x.id === f.clip.mediaId);
+  if (!m || m.kind === 'image') return false;
+  if (f.track.kind === 'audio') return true;
+  return m.kind === 'video' && !f.clip.audioDetached && m.hasAudio !== false;
+}
+
+/**
+ * Muda o volume num frame (relativo ao clip). Com keyframes de volume, cria/atualiza o keyframe nesse frame
+ * (como no CapCut); sem keyframes, muda o volume do clip todo.
+ */
+export function setVolumeAt(p: Project, clipId: string, rel: number, v: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  if (!c.volKeys?.length) return updateClip(p, clipId, { volume: clampVol(v) });
+  const fr = Math.min(c.duration, Math.max(0, Math.round(rel)));
+  const others = c.volKeys.filter((k) => k.f !== fr);
+  return updateClip(p, clipId, { volKeys: sortVol([...others, { f: fr, v: clampVol(v) }]) });
+}
+
+/** Acrescenta um keyframe de volume (com o volume atual nesse ponto, ou `v`) */
+export function addVolKey(p: Project, clipId: string, rel: number, v?: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  const fr = Math.min(c.duration, Math.max(0, Math.round(rel)));
+  const val = clampVol(v ?? volumeAt(c, fr));
+  const others = (c.volKeys ?? []).filter((k) => k.f !== fr);
+  return updateClip(p, clipId, { volKeys: sortVol([...others, { f: fr, v: val }]) });
+}
+
+/** Move o keyframe `index` (frame e valor); não passa por cima dos vizinhos */
+export function moveVolKey(p: Project, clipId: string, index: number, rel: number, v: number): Project {
+  const f = findClip(p, clipId);
+  const keys = f?.clip.volKeys;
+  if (!f || !keys?.[index]) return p;
+  const lo = index > 0 ? keys[index - 1].f + 1 : 0;
+  const hi = index < keys.length - 1 ? keys[index + 1].f - 1 : f.clip.duration;
+  const fr = Math.min(hi, Math.max(lo, Math.round(rel)));
+  return updateClip(p, clipId, { volKeys: keys.map((k, i) => (i === index ? { f: fr, v: clampVol(v) } : k)) });
+}
+
+/** Apaga um keyframe de volume; o último que sobra passa a ser o volume do clip */
+export function removeVolKey(p: Project, clipId: string, index: number): Project {
+  const f = findClip(p, clipId);
+  const keys = f?.clip.volKeys;
+  if (!f || !keys?.[index]) return p;
+  const rest = keys.filter((_, i) => i !== index);
+  if (rest.length) return updateClip(p, clipId, { volKeys: rest });
+  return updateClip(p, clipId, { volKeys: undefined, volume: keys[index].v });
+}
+
+/** Tira os keyframes de volume, ficando com o volume do frame indicado */
+export function clearVolKeys(p: Project, clipId: string, rel: number): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.volKeys?.length) return p;
+  return updateClip(p, clipId, { volKeys: undefined, volume: clampVol(volumeAt(f.clip, rel)) });
+}
+
+/** Multiplica o volume do clip (e os keyframes) por um ganho */
+export function applyGain(p: Project, clipId: string, gain: number): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  return updateClip(p, clipId, {
+    volume: clampVol(c.volume * gain),
+    ...(c.volKeys ? { volKeys: c.volKeys.map((k) => ({ ...k, v: clampVol(k.v * gain) })) } : {}),
+  });
+}
+
+/** Alvo de volume (LUFS, como o YouTube / Instagram / TikTok) e pico máximo */
+export const LOUDNESS_TARGET = -14;
+export const PEAK_MAX_DB = -1;
+
+/**
+ * Volume que põe um clip no alvo, a partir da medição do seu excerto: sonoridade integrada (LUFS) e pico (dBTP),
+ * sem deixar o pico passar de −1 dB. Devolve o multiplicador final (para `volume`).
+ */
+export function normalizedGain(lufs: number, peakDb: number, target = LOUDNESS_TARGET): number {
+  if (!Number.isFinite(lufs) || lufs < -70) return 1; // silêncio: não mexe
+  const byLoud = Math.pow(10, (target - lufs) / 20);
+  const byPeak = Number.isFinite(peakDb) ? Math.pow(10, (PEAK_MAX_DB - peakDb) / 20) : Infinity;
+  return Math.min(VOL_MAX, byLoud, byPeak);
+}
+
+// ---------- stickers e emojis ----------
+export function addStickerClip(
+  p: Project, sticker: import('../shared/types').StickerContent, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean } = {},
+): { project: Project; clipId: string | null } {
+  const duration = 3 * p.fps;
+  let project = p;
+  let track = opts.trackId ? p.tracks.find((t) => t.id === opts.trackId && t.kind === 'video') : undefined;
+  if (!track && !opts.newTrack) track = overlayTrack(project, start, duration);
+  if (!track) {
+    const r = addTrack(project, 'video', true);
+    project = r.project;
+    track = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  const desired = opts.magnet ? magnetStart(track, start) : start;
+  const clip: Clip = {
+    id: uid('c'), mediaId: '', start: freeStart(track, desired, duration), duration,
+    trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0, sticker,
+    transform: { ...DEFAULT_TRANSFORM, scale: 0.35 },
+  };
+  project = mapTrack(project, track.id, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
+  return { project, clipId: clip.id };
+}
+
+export function updateSticker(p: Project, clipId: string, patch: Partial<import('../shared/types').StickerContent>): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.sticker) return p;
+  return updateClip(p, clipId, { sticker: { ...f.clip.sticker, ...patch } });
+}
+
+// ---------- ritmo: batidas ----------
+export function setMediaBeats(p: Project, mediaId: string, bpm: number, beats: number[]): Project {
+  return { ...p, media: p.media.map((m) => (m.id === mediaId ? { ...m, bpm, beats } : m)) };
+}
+
+/** Batidas de um clip em frames da timeline (só as que caem dentro do clip) */
+export function clipBeatFrames(p: Project, clip: Clip): number[] {
+  const m = p.media.find((x) => x.id === clip.mediaId);
+  if (!m?.beats?.length) return [];
+  const sp = clipSpeed(clip);
+  const out: number[] = [];
+  for (const b of m.beats) {
+    const f = Math.round(clip.start + (b * p.fps - clip.trimStart) / sp);
+    if (f >= clip.start && f <= clip.start + clip.duration) out.push(f);
+  }
+  return out;
+}
+
+/** Todas as batidas do projeto (para o íman), sem repetições */
+export function allBeatFrames(p: Project): number[] {
+  const set = new Set<number>();
+  for (const t of p.tracks) {
+    if (t.kind === 'text') continue;
+    for (const c of t.clips) for (const f of clipBeatFrames(p, c)) set.add(f);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+/** Clip com batidas detetadas: o selecionado, ou o primeiro de áudio que tenha */
+export function rhythmSource(p: Project, selection: string[]): Clip | null {
+  for (const id of selection) { const f = findClip(p, id); if (f && clipBeatFrames(p, f.clip).length) return f.clip; }
+  for (const t of p.tracks) if (t.kind === 'audio') for (const c of t.clips) if (clipBeatFrames(p, c).length) return c;
+  for (const t of p.tracks) for (const c of t.clips) if (clipBeatFrames(p, c).length) return c;
+  return null;
+}
+
+/** Clips visuais a encaixar: os selecionados (vídeo/imagem/modelo…) ou os da pista de vídeo principal (a de baixo com clips) */
+export function rhythmTargets(p: Project, selection: string[], sourceId: string): Clip[] {
+  const sel = selection.map((id) => findClip(p, id)).filter((f): f is NonNullable<typeof f> => !!f && f.clip.id !== sourceId && f.track.kind === 'video');
+  if (sel.length) return sel.map((f) => f.clip).sort((a, b) => a.start - b.start);
+  // sem seleção: a pista com mais vídeos/imagens (stickers, animações e textos ficam onde estão)
+  const isMedia = (c: Clip) => !!p.media.find((m) => m.id === c.mediaId && (m.kind === 'video' || m.kind === 'image'));
+  let best: Track | undefined, n = 0;
+  for (const t of p.tracks) {
+    if (t.kind !== 'video') continue;
+    const k = t.clips.filter(isMedia).length;
+    if (k >= n && k > 0) { best = t; n = k; }
+  }
+  return best ? sortClips(best.clips.filter(isMedia)) : [];
+}
+
+/**
+ * Encaixa clips nas batidas: põe-nos seguidos, a partir da primeira batida, cada um a durar `every` batidas
+ * (vídeos mais curtos que isso acabam na batida mais distante que conseguem alcançar).
+ */
+export function beatSync(p: Project, sourceId: string, targetIds: string[], every: number): { project: Project; select: string[]; placed: number } {
+  const src = findClip(p, sourceId);
+  if (!src) return { project: p, select: [], placed: 0 };
+  let grid = clipBeatFrames(p, src.clip);
+  if (grid.length < 2 || !targetIds.length) return { project: p, select: [], placed: 0 };
+  // prolonga a grelha com o intervalo médio, para clips que passem do fim da música
+  const avg = (grid[grid.length - 1] - grid[0]) / (grid.length - 1);
+  const targets = targetIds.map((id) => findClip(p, id)).filter((f): f is NonNullable<typeof f> => !!f).sort((a, b) => a.clip.start - b.clip.start);
+  const trackId = targets[0].track.id;
+  let project = deleteClips(p, targets.map((t) => t.clip.id));
+  const need = targets.length * every * 2 + 4;
+  while (grid.length < need) grid = [...grid, Math.round(grid[grid.length - 1] + avg)];
+  const placed: Clip[] = [];
+  let gi = 0;
+  for (const { clip } of targets) {
+    const media = project.media.find((m) => m.id === clip.mediaId);
+    const sp = clipSpeed(clip);
+    const maxDur = media && media.kind === 'video' ? Math.floor((sourceFrames(media, project.fps) - clip.trimStart) / sp) : Infinity;
+    const start = grid[gi];
+    let gj = Math.min(grid.length - 1, gi + every);
+    while (gj > gi + 1 && grid[gj] - start > maxDur) gj--;
+    const duration = Math.max(1, Math.min(maxDur, grid[gj] - start));
+    const scale = duration / clip.duration;
+    placed.push({
+      ...clip, start, duration,
+      fadeIn: Math.min(clip.fadeIn, duration), fadeOut: Math.min(clip.fadeOut, duration),
+      keyframes: clip.keyframes ? scaleKeyframes(clip.keyframes, scale) : undefined,
+      ...(clip.volKeys ? { volKeys: scaleVolKeys(clip.volKeys, scale) } : {}),
+      ...(clip.caption ? sliceCaption(clip, 0, duration) : {}),
+    });
+    gi = gj;
+  }
+  // na pista original se couber; senão numa pista nova
+  const end = placed[placed.length - 1].start + placed[placed.length - 1].duration;
+  let target = project.tracks.find((t) => t.id === trackId)!;
+  if (overlaps(target, placed[0].start, end - placed[0].start).length) {
+    const r = addTrack(project, 'video', true);
+    project = r.project;
+    target = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  project = mapTrack(project, target.id, (t) => ({ ...t, clips: sortClips([...t.clips, ...placed]) }));
+  return { project, select: placed.map((c) => c.id), placed: placed.length };
+}
+
+/** Divide clips em vários pontos (frames da timeline) de uma vez */
+export function splitAtFrames(p: Project, clipIds: string[], frames: number[]): { project: Project; created: string[] } {
+  let project = p;
+  const created: string[] = [];
+  let ids = [...clipIds];
+  for (const f of [...frames].sort((a, b) => a - b)) {
+    const r = splitClips(project, ids, f);
+    if (r.created.length) { project = r.project; created.push(...r.created); ids = [...ids, ...r.created]; }
+  }
+  return { project, created };
+}
+
+/** Frames da timeline onde um clip mostra os tempos da fonte indicados (segundos) — para cortes de cena */
+export function sourceTimesToFrames(p: Project, clip: Clip, times: number[]): number[] {
+  const sp = clipSpeed(clip);
+  const minGap = Math.max(2, Math.round(p.fps * 0.25));
+  return times
+    .map((t) => Math.round(clip.start + (t * p.fps - clip.trimStart) / sp))
+    .filter((f) => f > clip.start + minGap && f < clip.start + clip.duration - minGap);
 }

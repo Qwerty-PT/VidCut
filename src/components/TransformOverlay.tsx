@@ -7,6 +7,7 @@ import { clamp } from '../util';
 import { baseSize, getTransform } from '../../shared/transform';
 import type { MediaItem } from '../../shared/types';
 import { clipLottie, lottieMedia } from '../../shared/lottie';
+import { stickerMedia } from '../../shared/stickers';
 
 const SNAPS = [50, 100 / 3, 200 / 3];
 
@@ -24,6 +25,7 @@ export const TransformOverlay: React.FC = () => {
   const media: MediaItem | undefined = clip?.template
     ? { id: '', path: '', name: '', kind: 'image', durationSec: 0, width: project.width, height: project.height }
     : clip?.lottie ? lottieMedia(clipLottie(project, clip))
+    : clip?.sticker ? stickerMedia(clip.sticker)
     : clip ? project.media.find((m) => m.id === clip.mediaId) : undefined;
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   if (!clip || !sel || sel.track.kind !== 'video' || !media || media.kind === 'audio') return null;

@@ -15,6 +15,9 @@ export interface MediaItem {
   hasAudio?: boolean;
   width?: number;
   height?: number;
+  /** Batidas detetadas (segundos da fonte) e andamento — para cortar ao ritmo */
+  beats?: number[];
+  bpm?: number;
 }
 
 export interface Clip {
@@ -60,6 +63,26 @@ export interface Clip {
   bgBlur?: number;
   /** Efeitos da biblioteca (por ordem), com intensidade 0..100 */
   effects?: { id: string; intensity: number }[];
+  /** Keyframes de volume (frames relativos ao clip; v como `volume`, 0..4). Com keyframes, substituem `volume` */
+  volKeys?: VolKey[];
+  /** Sticker ou emoji (mediaId vazio) */
+  sticker?: StickerContent;
+}
+
+export interface VolKey { f: number; v: number }
+
+export type StickerAnim = 'none' | 'pop' | 'bounce' | 'float' | 'pulse' | 'wobble' | 'swing' | 'spin' | 'shake' | 'heartbeat' | 'draw';
+
+export interface StickerContent {
+  /** id de um sticker incluído (shared/stickers.tsx) ou 'emoji' */
+  id: string;
+  name: string;
+  /** Emojis: o SVG vai guardado no projeto */
+  svg?: string;
+  /** Stickers com texto ou cor editáveis */
+  text?: string;
+  color?: string;
+  anim: StickerAnim;
 }
 
 export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';

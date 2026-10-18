@@ -19,6 +19,49 @@ import { EFFECT_DRAG_TYPE } from './EffectsLibrary';
 import { getEffect } from '../../shared/effects';
 import { addEffect, effectTarget } from '../ops';
 import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
+import { isTyping } from '../util';
+import { STICKER_DRAG_TYPE, getDraggedSticker } from './StickerLibrary';
+import { addStickerClip } from '../ops';
+
+/**
+ * Ecrã inteiro da pré-visualização (botão, tecla F, duplo clique; Esc sai).
+ * A pré-visualização ocupa a janela toda e a janela passa a ecrã inteiro (mais fiável no Electron do que a API do browser).
+ */
+function useFullscreen() {
+  const [on, setOn] = useState(false);
+  const toggle = React.useCallback(() => setOn((v) => !v), []);
+  useEffect(() => {
+    void window.vidcut?.setFullScreen(on);
+    document.body.classList.toggle('preview-fullscreen', on);
+  }, [on]);
+  // a janela saiu do ecrã inteiro por outro lado (botão verde no Mac, F11…)
+  useEffect(() => window.vidcut?.onFullScreen?.((v) => { if (!v) setOn(false); }), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggle(); }
+      else if (e.key === 'Escape' && on) { e.preventDefault(); setOn(false); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggle, on]);
+  return { on, toggle };
+}
+
+/** Em ecrã inteiro a reproduzir, os controlos escondem-se quando o rato fica parado */
+function useIdle(active: boolean, ms = 2200) {
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    if (!active) { setIdle(false); return; }
+    let t: ReturnType<typeof setTimeout>;
+    const wake = () => { setIdle(false); clearTimeout(t); t = setTimeout(() => setIdle(true), ms); };
+    wake();
+    window.addEventListener('pointermove', wake);
+    window.addEventListener('keydown', wake);
+    return () => { clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('keydown', wake); };
+  }, [active, ms]);
+  return idle;
+}
 
 export const Preview: React.FC = () => {
   const { state, mediaBase, commit } = useEditor();
@@ -26,6 +69,9 @@ export const Preview: React.FC = () => {
   const [dropOver, setDropOver] = useState(false);
   const project = ov ? ov.project : state.project;
   const ref = useRef<PlayerRef>(null);
+  const fs = useFullscreen();
+  const playing = usePlaying();
+  const idle = useIdle(fs.on && playing);
   const duration = projectDuration(project);
   const inputProps = useMemo<CompositionProps>(() => ({ project, mediaBase }), [project, mediaBase]);
 
@@ -100,18 +146,29 @@ export const Preview: React.FC = () => {
   }, [duration]);
 
   return (
-    <section className="preview">
+    <section className={`preview${fs.on ? ' is-fullscreen' : ''}${idle ? ' idle' : ''}`}>
       <div className="preview-stage">
         <div
           className={`preview-frame${dropOver ? ' drop-over' : ''}`}
           style={{ aspectRatio: `${project.width} / ${project.height}` }}
-          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
+          onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('.tf-layer, .text-drag')) fs.toggle(); }}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(EFFECT_DRAG_TYPE) || e.dataTransfer.types.includes(STICKER_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
           onDragLeave={() => setDropOver(false)}
           onDrop={(e) => {
             setDropOver(false);
             const lid = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
             const tid = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
             const fxid = e.dataTransfer.getData(EFFECT_DRAG_TYPE);
+            const stk = e.dataTransfer.types.includes(STICKER_DRAG_TYPE) ? getDraggedSticker() : null;
+            if (stk) {
+              e.preventDefault();
+              clearPreview();
+              // larga o sticker onde se soltou o rato
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const x = clamp(((e.clientX - r.left) / r.width) * 100, 0, 100), y = clamp(((e.clientY - r.top) / r.height) * 100, 0, 100);
+              commit((p) => { const res = addStickerClip(p, stk, playhead.frame); return { project: res.clipId ? setAnimatedProps(res.project, res.clipId, 0, { x, y }) : res.project, select: res.clipId ? [res.clipId] : undefined }; });
+              return;
+            }
             if (fxid) {
               e.preventDefault();
               clearPreview();
@@ -144,7 +201,7 @@ export const Preview: React.FC = () => {
             controls={false}
             clickToPlay={false}
             spaceKeyToPlayOrPause={false}
-            doubleClickToFullscreen
+            doubleClickToFullscreen={false}
             moveToBeginningWhenEnded={false}
             acknowledgeRemotionLicense
             inFrame={ov ? Math.max(0, Math.min(ov.from, duration - 1)) : null}
@@ -157,7 +214,7 @@ export const Preview: React.FC = () => {
               <span className="dot" /> Pré-visualização · {ov.label}
               <button onClick={() => clearPreview()} title="Sair da pré-visualização (Esc)">Esc</button>
             </div>
-          ) : (
+          ) : fs.on ? null : (
             <>
               <TextDragOverlay />
               <TransformOverlay />
@@ -165,12 +222,12 @@ export const Preview: React.FC = () => {
           )}
         </div>
       </div>
-      <Transport duration={duration} fps={project.fps} />
+      <Transport duration={duration} fps={project.fps} fullscreen={fs.on} onFullscreen={fs.toggle} />
     </section>
   );
 };
 
-const Transport: React.FC<{ duration: number; fps: number }> = ({ duration, fps }) => {
+const Transport: React.FC<{ duration: number; fps: number; fullscreen: boolean; onFullscreen: () => void }> = ({ duration, fps, fullscreen, onFullscreen }) => {
   const frame = useFrame();
   const playing = usePlaying();
   return (
@@ -186,9 +243,10 @@ const Transport: React.FC<{ duration: number; fps: number }> = ({ duration, fps 
         <button className="icon-btn" title="Fim (End)" onClick={() => playhead.seek(duration - 1)}><Icon name="end" /></button>
       </div>
       <div className="transport-right">
-        <SafeZoneMenu />
-        <AspectMenu />
+        {!fullscreen && <SafeZoneMenu />}
+        {!fullscreen && <AspectMenu />}
         <span className="tc dim">{timecode(duration, fps)}</span>
+        <button className="icon-btn" title={fullscreen ? 'Sair do ecrã inteiro (Esc)' : 'Ecrã inteiro (F)'} onClick={onFullscreen}><Icon name={fullscreen ? 'exitFullscreen' : 'fullscreen'} /></button>
       </div>
     </div>
   );

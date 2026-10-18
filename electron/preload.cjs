@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('vidcut', {
   autosaveRead: () => ipcRenderer.invoke('autosave:read'),
   exportVideo: (project, spec) => ipcRenderer.invoke('export:start', { project, spec }),
   cancelExport: () => ipcRenderer.invoke('export:cancel'),
+  setFullScreen: (on) => ipcRenderer.invoke('win:fullscreen', !!on),
+  onFullScreen: (cb) => {
+    const h = (_e, v) => cb(v);
+    ipcRenderer.on('win:fullscreen', h);
+    return () => ipcRenderer.removeListener('win:fullscreen', h);
+  },
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   peaks: (file) => ipcRenderer.invoke('media:peaks', file),
   nativeEdit: (action) => ipcRenderer.invoke('edit:native', action),
@@ -52,6 +58,11 @@ contextBridge.exposeInMainWorld('vidcut', {
   saveRecording: (bytes, mime) => ipcRenderer.invoke('recording:save', { bytes, mime }),
   extractFrame: (file, timeSec) => ipcRenderer.invoke('frame:extract', { file, timeSec }),
   fontsImport: () => ipcRenderer.invoke('fonts:import'),
+  loudness: (file, start, dur) => ipcRenderer.invoke('audio:loudness', { file, start, dur }),
+  beats: (file) => ipcRenderer.invoke('audio:beats', file),
+  scenes: (o) => ipcRenderer.invoke('video:scenes', o),
+  soundsList: () => ipcRenderer.invoke('sounds:list'),
+  soundsUse: (file) => ipcRenderer.invoke('sounds:use', file),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateDownload: () => ipcRenderer.invoke('update:download'),
   updateCancel: () => ipcRenderer.invoke('update:cancel'),

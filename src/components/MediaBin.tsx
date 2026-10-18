@@ -9,6 +9,8 @@ import { LottieLibrary } from './LottieLibrary';
 import { EffectsLibrary } from './EffectsLibrary';
 import { ScreenRecorder } from './ScreenRecorder';
 import { TemplateGallery } from './TemplateGallery';
+import { StickerLibrary } from './StickerLibrary';
+import { SoundLibrary } from './SoundLibrary';
 import type { MediaItem } from '../../shared/types';
 
 export const MEDIA_DRAG_TYPE = 'application/x-vidcut-media';
@@ -24,7 +26,7 @@ export const MediaBin: React.FC = () => {
   const { state, commit, importPaths, notify } = useEditor();
   const [, force] = useState(0);
   const [dragOver, setDragOver] = useState(false);
-  const [tab, setTab] = useState<'media' | 'templates' | 'lottie' | 'effects'>('media');
+  const [tab, setTab] = useState<'media' | 'audio' | 'templates' | 'lottie' | 'effects' | 'stickers'>('media');
   const [recOpen, setRecOpen] = useState(false);
   useEffect(() => onThumbsChange(() => force((n) => n + 1)), []);
 
@@ -63,7 +65,7 @@ export const MediaBin: React.FC = () => {
       onDrop={onDrop}
     >
       <nav className="bin-tabs" role="tablist" aria-label="Biblioteca">
-        {([['media', 'Media', 'film'], ['templates', 'Modelos', 'layers'], ['lottie', 'Animações', 'sparkle'], ['effects', 'Efeitos', 'wand']] as const).map(([id, label, icon]) => (
+        {([['media', 'Media', 'film'], ['audio', 'Áudio', 'sound'], ['templates', 'Modelos', 'layers'], ['lottie', 'Animações', 'sparkle'], ['effects', 'Efeitos', 'wand'], ['stickers', 'Stickers', 'smile']] as const).map(([id, label, icon]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
             <Icon name={icon} size={18} />
             <span>{label}</span>
@@ -77,7 +79,7 @@ export const MediaBin: React.FC = () => {
         </div>
       )}
       {recOpen && <ScreenRecorder onClose={() => setRecOpen(false)} />}
-      {tab === 'effects' ? <EffectsLibrary /> : tab === 'lottie' ? <LottieLibrary /> : tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
+      {tab === 'audio' ? <SoundLibrary /> : tab === 'stickers' ? <StickerLibrary /> : tab === 'effects' ? <EffectsLibrary /> : tab === 'lottie' ? <LottieLibrary /> : tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
         <button className="empty-drop" onClick={pick}>
           <Icon name="import" size={28} />
           <strong>Importar media</strong>

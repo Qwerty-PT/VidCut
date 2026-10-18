@@ -8,9 +8,10 @@ import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
-import { CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { MultiAudioActions, RhythmSection, ScenesButton, StickerSection, VolumeSection, CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
+import { stickerMedia } from '../../shared/stickers';
 import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
 import { DIRECTIONAL, DIR_LABELS, TRANSITIONS, maxTransition, prevAdjacent, transitionLabel } from '../../shared/transitions';
 import { cancelHover, clearHoverPreview, hoverPreview, setPreview, transitionPreview } from '../preview-override';
@@ -69,6 +70,7 @@ export const Inspector: React.FC = () => {
       <aside className="panel inspector">
         <header className="panel-head"><h2>{selection.length} clips</h2></header>
         <div className="inspector-body">
+          <MultiAudioActions ids={selection} />
           <button className="btn danger block" onClick={() => commit((p) => deleteClips(p, selection), [])}>
             <Icon name="trash" size={16} /> Apagar seleção
           </button>
@@ -130,6 +132,7 @@ export const Inspector: React.FC = () => {
   const media: MediaItem | undefined = clip.template
     ? { id: '', path: '', name: tplDef?.name ?? 'Modelo', kind: 'image', durationSec: 0, width: project.width, height: project.height }
     : clip.lottie ? lottieMedia(lottieAsset)
+    : clip.sticker ? stickerMedia(clip.sticker)
     : project.media.find((m) => m.id === clip.mediaId);
   const fps = project.fps;
   const maxFade = Math.max(0, Math.floor(clip.duration / 2));
@@ -173,11 +176,11 @@ export const Inspector: React.FC = () => {
   return (
     <aside className="panel inspector">
       <header className="panel-head">
-        <h2 className="ellipsis" title={media?.name}>{media?.name ?? 'Clip'}</h2>
+        <h2 className="ellipsis" title={media?.name}>{clip.sticker ? clip.sticker.name : media?.name ?? 'Clip'}</h2>
       </header>
       {hasTabs && (
         <div className="tabs" role="tablist">
-          {([['basic', clip.template ? 'Modelo' : 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor · Fx'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
+          {([['basic', clip.template ? 'Modelo' : clip.sticker ? 'Sticker' : 'Básico'], ['frame', 'Enquadrar'], ['color', 'Cor · Fx'], ['anim', 'Animação']] as [ClipTab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={curTab === id} className={curTab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
@@ -234,11 +237,8 @@ export const Inspector: React.FC = () => {
               </div>
             )}
 
-            {media?.kind !== 'image' && !clip.audioDetached && (
-              <Row label="Volume" hint={`${Math.round(clip.volume * 100)}%`}>
-                <Range min={0} max={2} step={0.01} value={clip.volume} apply={(v) => (p) => updateClip(p, clip.id, { volume: v })} />
-              </Row>
-            )}
+            {clip.sticker && <StickerSection clip={clip} />}
+            {media && media.kind !== 'image' && !clip.audioDetached && !clip.lottie && <VolumeSection clip={clip} />}
 
             <Row label="Fade in" hint={`${sec(clip.fadeIn)} s`}>
               <Range min={0} max={maxFade} step={1} value={Math.min(clip.fadeIn, maxFade)} apply={(v) => (p) => updateClip(p, clip.id, { fadeIn: v })} />
@@ -255,6 +255,8 @@ export const Inspector: React.FC = () => {
             </p>
 
             {((media && media.kind !== 'image') || clip.lottie) && <SpeedSection clip={clip} fps={fps} />}
+            {media?.kind === 'video' && isVisual && !clip.template && !clip.lottie && <ScenesButton clip={clip} />}
+            {media && (media.kind === 'audio' || (media.kind === 'video' && !isVisual)) && <RhythmSection clip={clip} media={media} />}
           </>
         )}
         {curTab === 'frame' && media && <TransformSection clip={clip} media={media} />}
