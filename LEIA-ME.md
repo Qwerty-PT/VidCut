@@ -195,6 +195,15 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 7. ~~Opções de export: formatos, resolução, qualidade, fps, intervalo~~ (feito)
 8. ~~Instaladores: .dmg (macOS), .exe instalador e portátil (Windows), AppImage e .deb (Linux)~~ (feito)
 
+### Backlog
+
+- **Proxies (edição em baixa resolução):** cópias leves (ex. 540p/720p, H.264 com GOP curto) geradas em segundo plano ao importar ou a pedido; a pré-visualização usa o proxy, o export usa sempre o original. Interruptor "Usar proxies" na barra, indicador por ficheiro (a gerar / pronto), cache em userData/proxies e opção para apagar. Útil em computadores lentos e com vídeo 4K/HEVC (que o Chromium nem sempre pré-visualiza)
+- Mais transições: direções, formas, desfocar, flash, glitch
+- Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
+- Lottie: animações prontas (.json)
+- Vídeos em lote: um modelo + uma lista → um vídeo por linha
+- Sugestões em aberto: legendas (.srt / automáticas), ecrã verde, aceleração por hardware no export (Mac), marcadores na timeline, pré-visualização em ecrã inteiro
+
 
 1. ~~Base: importar, timeline multi-pista, mover/aparar/dividir, íman, zoom, desfazer, exportar~~ (feito, com fades e volume adiantados)
 2. ~~Transições entre clips e pegas de fade arrastáveis~~ (feito)
