@@ -9,13 +9,57 @@ import { findClip, setAnimatedProps } from '../ops';
 import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
+import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
 
 export const Preview: React.FC = () => {
   const { state, mediaBase } = useEditor();
-  const { project } = state;
+  const ov = usePreviewOverride();
+  const project = ov ? ov.project : state.project;
   const ref = useRef<PlayerRef>(null);
   const duration = projectDuration(project);
   const inputProps = useMemo<CompositionProps>(() => ({ project, mediaBase }), [project, mediaBase]);
+
+  // ---------- pré-visualização temporária ----------
+  const saved = useRef<{ frame: number } | null>(null);
+  useEffect(() => {
+    const p = ref.current;
+    if (!p) return;
+    if (ov) {
+      if (!saved.current) { saved.current = { frame: playhead.frame }; p.pause(); playhead.setPlaying(false); }
+      playhead.locked = true;
+      // dá um tick para o Player aceitar o novo intervalo antes de saltar e tocar
+      const t = setTimeout(() => { p.seekTo(ov.from); p.play(); }, 30);
+      return () => clearTimeout(t);
+    }
+    if (saved.current) {
+      const f = saved.current.frame;
+      saved.current = null;
+      p.pause();
+      playhead.locked = false;
+      setTimeout(() => p.seekTo(f), 30);
+    }
+  }, [ov]);
+  // qualquer edição real ao projeto termina a pré-visualização
+  const lastProject = useRef(state.project);
+  useEffect(() => {
+    if (lastProject.current === state.project) return;
+    lastProject.current = state.project;
+    const cur = getPreview();
+    if (cur && cur.base !== state.project) clearPreview();
+  }, [state.project]);
+  useEffect(() => {
+    if (!ov) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearPreview(); } };
+    // clicar fora de quem pediu a pré-visualização (e fora do ecrã) termina-a
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('[data-preview-source], .preview-frame, .preview-badge')) return;
+      clearPreview();
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDown, true); };
+  }, [ov]);
 
   useEffect(() => {
     const p = ref.current;
@@ -64,9 +108,21 @@ export const Preview: React.FC = () => {
             doubleClickToFullscreen
             moveToBeginningWhenEnded={false}
             acknowledgeRemotionLicense
+            inFrame={ov ? Math.max(0, Math.min(ov.from, duration - 1)) : null}
+            outFrame={ov ? Math.max(Math.min(ov.from, duration - 1) + 1, Math.min(ov.to, duration - 1)) : null}
+            loop={!!ov}
           />
-          <TextDragOverlay />
-          <TransformOverlay />
+          {ov ? (
+            <div className="preview-badge" role="status">
+              <span className="dot" /> Pré-visualização · {ov.label}
+              <button onClick={() => clearPreview()} title="Sair da pré-visualização (Esc)">Esc</button>
+            </div>
+          ) : (
+            <>
+              <TextDragOverlay />
+              <TransformOverlay />
+            </>
+          )}
         </div>
       </div>
       <Transport duration={duration} fps={project.fps} />

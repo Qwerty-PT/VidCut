@@ -7,6 +7,7 @@ import { playhead } from '../playhead';
 import { TEMPLATES } from '../../shared/templates';
 import { TemplateDurationContext, templateDefaults, type TemplateDef } from '../../shared/template-api';
 import { TEMPLATE_DRAG_TYPE } from './MediaBin';
+import { setPreview, templatePreview } from '../preview-override';
 
 /** Pré-visualização de um modelo com os valores por defeito (fundo xadrez escuro se for transparente) */
 const PreviewComp: React.FC<{ def: TemplateDef; dur: number }> = ({ def, dur }) => {
@@ -41,9 +42,11 @@ const Card: React.FC<{ def: TemplateDef; onAdd: () => void }> = ({ def, onAdd })
       draggable
       onDragStart={(e) => { e.dataTransfer.setData(TEMPLATE_DRAG_TYPE, def.id); e.dataTransfer.effectAllowed = 'copy'; }}
       onDoubleClick={onAdd}
+      onClick={() => { const o = templatePreview(state.project, def.id, playhead.frame); if (o) setPreview({ ...o, sticky: true }); }}
+      data-preview-source
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title={`${def.description ?? def.name}\nDuplo clique ou arrastar para a timeline`}
+      title={`${def.description ?? def.name}\nClique: ver no ecrã principal · Duplo clique ou arrastar: adicionar`}
     >
       <div className="tpl-thumb">
         {hover

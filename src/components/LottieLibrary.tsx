@@ -9,6 +9,7 @@ import {
   LOTTIE_SOURCES, PACK, PACK_CATEGORIES, addUserLotties, loadUserLotties, removeUserLottie, useUserLotties, type LottieEntry,
 } from '../lottie-registry';
 import { Icon } from './Icon';
+import { lottiePreview, setPreview } from '../preview-override';
 
 export const LOTTIE_DRAG_TYPE = 'application/x-vidcut-lottie';
 
@@ -37,15 +38,18 @@ const LottieThumb: React.FC<{ entry: LottieEntry; playing: boolean }> = ({ entry
 
 const LottieCard: React.FC<{ entry: LottieEntry; onAdd: () => void; onRemove?: () => void }> = ({ entry, onAdd, onRemove }) => {
   const [hover, setHover] = useState(false);
+  const { state } = useEditor();
   return (
     <li
       className="tpl-card lot-card"
       draggable
       onDragStart={(e) => { e.dataTransfer.setData(LOTTIE_DRAG_TYPE, entry.id); e.dataTransfer.effectAllowed = 'copy'; }}
       onDoubleClick={onAdd}
+      onClick={() => { const o = lottiePreview(state.project, { id: entry.id, name: entry.name, data: entry.data }, playhead.frame); if (o) setPreview({ ...o, sticky: true }); }}
+      data-preview-source
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title={`${entry.name}\nDuplo clique ou arrastar para a timeline`}
+      title={`${entry.name}\nClique: ver no ecrã principal · Duplo clique ou arrastar: adicionar`}
     >
       <div className="tpl-thumb lot-thumb"><LottieThumb entry={entry} playing={hover} /></div>
       <span className="tpl-name">{entry.name}</span>

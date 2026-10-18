@@ -11,8 +11,10 @@ export const playhead = {
   player: null as PlayerRef | null,
   get frame() { return frame; },
   get playing() { return playing; },
-  setFrame(f: number) { if (f !== frame) { frame = f; emit(); } },
-  setPlaying(p: boolean) { if (p !== playing) { playing = p; emit(); } },
+  /** Durante uma pré-visualização temporária, o leitor não move a cabeça de leitura da timeline */
+  locked: false,
+  setFrame(f: number) { if (playhead.locked) return; if (f !== frame) { frame = f; emit(); } },
+  setPlaying(p: boolean) { if (playhead.locked) return; if (p !== playing) { playing = p; emit(); } },
   seek(f: number) {
     const v = Math.max(0, Math.round(f));
     frame = v;

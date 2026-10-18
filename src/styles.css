@@ -691,3 +691,17 @@ body.tf-dragging, body.tf-dragging * { user-select: none; }
 .btn-col { display: flex; flex-direction: column; gap: 8px; }
 .clip.kind-text:has(.clip-name) { }
 .bin-head .btn.icon-only { width: 28px; padding: 0; justify-content: center; flex: none; }
+
+/* ---------- pré-visualização temporária ---------- */
+.preview-badge {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 5;
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 16px;
+  background: rgba(14, 15, 18, 0.82); border: 1px solid var(--amber); color: var(--text); font-size: 12px; white-space: nowrap;
+  animation: toast-in 240ms var(--ease);
+}
+.preview-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); animation: pv-pulse 1.4s ease-in-out infinite; }
+.preview-badge button { height: 20px; padding: 0 7px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); color: var(--text-dim); font: 11px var(--mono); cursor: pointer; }
+.preview-badge button:hover { color: var(--text); }
+@keyframes pv-pulse { 50% { opacity: 0.35; } }
+.preview-frame { position: relative; }
+.tpl-card.previewing .tpl-thumb { outline: 2px solid var(--amber); }

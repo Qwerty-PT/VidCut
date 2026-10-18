@@ -10,7 +10,8 @@ import { CaptionSection, AnimSection, ColorSection, SpeedSection, TemplateFields
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
-import { DIRECTIONAL, DIR_LABELS, TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
+import { DIRECTIONAL, DIR_LABELS, TRANSITIONS, maxTransition, prevAdjacent, transitionLabel } from '../../shared/transitions';
+import { cancelHover, clearHoverPreview, hoverPreview, setPreview, transitionPreview } from '../preview-override';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 
 const RESOLUTIONS: { label: string; w: number; h: number }[] = [
@@ -270,7 +271,16 @@ const TransitionPanel: React.FC<{ clipId: string }> = ({ clipId }) => {
   const fps = project.fps;
   const max = maxTransition(prev, f.clip);
   const dur = Math.min(tr.duration, max);
-  const set = (patch: Partial<typeof tr>) => commit((p) => setTransition(p, clipId, { ...tr, ...patch }));
+  // aplicar e mostrar logo no ecrã principal, a repetir entre os dois clips
+  const set = (patch: Partial<typeof tr>) => {
+    cancelHover();
+    const t2 = { ...tr, ...patch };
+    const next = setTransition(project, clipId, t2);
+    commit(() => next);
+    const o = transitionPreview(next, clipId, t2, `${transitionLabel(t2.type)} — Esc para sair`, next);
+    if (o) setPreview({ ...o, sticky: true });
+  };
+  const hover = (type: TransitionType) => hoverPreview(() => transitionPreview(project, clipId, { ...tr, type }, `${transitionLabel(type)} — clica para aplicar`));
   const sec = (dur / fps).toFixed(2).replace('.', ',');
   // durações IBM úteis para transições (as mais curtas são demasiado rápidas para vídeo)
   const presets: { label: string; ms: number }[] = [
@@ -280,7 +290,7 @@ const TransitionPanel: React.FC<{ clipId: string }> = ({ clipId }) => {
     { label: '1 s', ms: 1000 },
   ];
   return (
-    <aside className="panel inspector">
+    <aside className="panel inspector" data-preview-source onMouseLeave={() => { cancelHover(); clearHoverPreview(`tr:${clipId}`); }}>
       <header className="panel-head"><h2>Transição</h2></header>
       <div className="inspector-body">
         <div className="trans-grid" role="radiogroup" aria-label="Tipo de transição">
@@ -291,6 +301,8 @@ const TransitionPanel: React.FC<{ clipId: string }> = ({ clipId }) => {
               aria-checked={tr.type === t.type}
               className={`trans-opt${tr.type === t.type ? ' on' : ''}`}
               title={t.hint}
+              onMouseEnter={() => hover(t.type)}
+              onFocus={() => hover(t.type)}
               onClick={() => set({ type: t.type as TransitionType })}
             >
               <TransitionThumb type={t.type} />

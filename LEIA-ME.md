@@ -48,6 +48,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Legendas automáticas (locais):** seleciona um clip com fala → **Gerar legendas** (painel ou botão direito). Transcrição no próprio computador com o Whisper (whisper.cpp 1.5.5 via `@remotion/install-whisper-cpp`): na 1.ª vez prepara o motor (1–3 min; no Mac precisa das ferramentas da Apple — `xcode-select --install`) e descarrega o modelo escolhido (Rápido ~140 MB / Equilibrado ~470 MB / Preciso ~1,5 GB), tudo na pasta de dados da app. Cria uma pista **Legendas** com frases curtas e tempo por palavra. Estilos: Clássico (frase com fundo), Karaoke (palavra dita colorida), Caixa (palavra atual com caixa de cor, estilo Reels) e Palavra (uma de cada vez, grande). Editar o texto mantém os tempos se o nº de palavras for igual; dividir/aparar reparte as palavras. "Aplicar este aspeto a todas"; **Ficheiro → Importar/Exportar legendas (.srt)**. No export vídeo ficam queimadas na imagem
 
+- **Pré-visualização no ecrã principal:** numa transição, passar o rato mostra-a entre os teus dois clips (em loop, ±0,5 s à volta do corte) e clicar aplica e continua a mostrar; nos modelos e animações, um clique mostra-os por cima do vídeo na cabeça de leitura (duplo clique adiciona). Etiqueta "Pré-visualização" no ecrã; Esc, espaço, clique fora ou qualquer edição termina e a cabeça de leitura volta onde estava. Fica fora do histórico (não é uma edição)
+
 ## Requisitos
 
 - Node.js 20 ou superior

@@ -50,6 +50,19 @@ function extractAudio(file, startSec, durSec, out, signal) {
   });
 }
 
+/** Lista os codecs das faixas de áudio do ficheiro (vazio = sem som) */
+function audioStreams(file) {
+  return new Promise((resolve) => {
+    const { bin, env } = ffmpegPath();
+    const probe = bin.replace(/ffmpeg(\.exe)?$/, (m, ext) => `ffprobe${ext || ''}`);
+    const p = spawn(probe, ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file], { env });
+    let out = '';
+    p.stdout.on('data', (d) => { out += d; });
+    p.on('error', () => resolve(null)); // sem ffprobe: deixa seguir
+    p.on('close', () => resolve(out.split(/\s+/).filter(Boolean)));
+  });
+}
+
 /**
  * @param {{ dataDir: string, file: string, startSec: number, durSec: number, model: keyof MODELS, language: string|null }} o
  * @param {(p: {stage: string, progress: number, message: string}) => void} onProgress
@@ -60,6 +73,10 @@ function transcribeMedia(o, onProgress) {
   const d = dirs(o.dataDir);
   const model = MODELS[o.model] ? o.model : 'small';
   const promise = (async () => {
+    const streams = await audioStreams(o.file);
+    if (streams && streams.length === 0) {
+      throw new Error('Este ficheiro não tem som (não tem faixa de áudio), por isso não há fala para transcrever.\n\nSe o som estiver noutro ficheiro, gera as legendas a partir desse clip de áudio.');
+    }
     fs.mkdirSync(d.models, { recursive: true });
     const st = status(o.dataDir);
     if (!st.installed) {
