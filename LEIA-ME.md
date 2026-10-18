@@ -201,7 +201,9 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 - **Projetos portáteis (mudar de computador):**
   - Caminhos relativos ao ficheiro do projeto (pasta do projeto + `media/`) — funciona com pen, iCloud, Drive, Dropbox e entre Mac/Windows/Linux
   - Reencontrar ficheiros em falta ao abrir: escolher pasta, procura por nome + tamanho, um encontrado reencontra os restantes
-  - "Empacotar projeto": copia projeto + ficheiros usados para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
+  - "Empacotar projeto": copia projeto + tudo o que usa (media, Lotties, modelos próprios da pasta `modelos/`) para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
+  - Lotties usados ficam embutidos no próprio ficheiro do projeto (são pequenos) — abre noutro computador mesmo sem a animação na biblioteca de lá; ao abrir, oferece acrescentá-la à biblioteca local
+  - Modelos próprios em falta no outro computador: aviso claro (nome do modelo) e o clip mantém-se, pronto a voltar quando o modelo for instalado
 - **Legendas automáticas (local):** Whisper via whisper.cpp (`@remotion/install-whisper-cpp` + `@remotion/captions`), offline e grátis, modelo descarregado uma vez (base / small (sugerido) / medium). Áudio extraído com o ffmpeg incluído → pista de legendas com tempo por palavra, editável na timeline (juntar/partir, ajustar tempos). Estilos: clássico em baixo e palavra a palavra (TikTok/Reels) com curvas IBM. Importar/exportar .srt; no export queimadas no vídeo ou .srt à parte
 - Mais transições: direções, formas, desfocar, flash, glitch
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
