@@ -205,7 +205,12 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 - **Legendas automáticas (local):** Whisper via whisper.cpp (`@remotion/install-whisper-cpp` + `@remotion/captions`), offline e grátis, modelo descarregado uma vez (base / small (sugerido) / medium). Áudio extraído com o ffmpeg incluído → pista de legendas com tempo por palavra, editável na timeline (juntar/partir, ajustar tempos). Estilos: clássico em baixo e palavra a palavra (TikTok/Reels) com curvas IBM. Importar/exportar .srt; no export queimadas no vídeo ou .srt à parte
 - Mais transições: direções, formas, desfocar, flash, glitch
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
-- Lottie: animações prontas (.json)
+- **Lottie (animações vetoriais):**
+  - Biblioteca na barra lateral (separador "Animações", ao lado de Media e Modelos), por categorias, com pré-visualização ao passar o rato e duplo clique / arrastar para a timeline
+  - Pack inicial incluído (~15–20): ícones (✓, ✗, ❤️, estrela, setas), confetes e fogo de artifício, "subscrever"/"gosto"/"partilhar", sublinhados e círculos desenhados à mão, carregamento — criados por nós (sem problemas de licença) com curvas IBM; cores editáveis quando a animação o permitir
+  - Importar mais: botão "Adicionar" + arrastar ficheiros `.json` (Lottie JSON) e `.lottie` (dotLottie, comprimido); ficam guardados numa biblioteca do utilizador (pasta de dados da app) e disponíveis em todos os projetos
+  - "Obter mais": atalhos que abrem no browser LottieFiles, Lordicon, IconScout, useAnimations (com aviso para confirmar a licença de cada animação)
+  - Na timeline comportam-se como clips de vídeo com transparência: posição, tamanho, velocidade, loop, keyframes; render com `@remotion/lottie` (pré-visualização = export)
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export
 - **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada
