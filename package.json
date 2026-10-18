@@ -1,7 +1,7 @@
 {
   "name": "vidcut",
   "productName": "VidCut",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Editor de vídeo simples com animações (Remotion + Electron)",
   "author": "Nuno Silva",
   "private": true,
