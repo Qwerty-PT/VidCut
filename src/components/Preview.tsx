@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { VidCutComposition } from '../../shared/VidCutComposition';
 import { projectDuration, type CompositionProps } from '../../shared/types';
 import { useEditor } from '../editor-context';
 import { playhead, useFrame, usePlaying } from '../playhead';
 import { clamp, timecode } from '../util';
-import { findClip, setAnimatedProps } from '../ops';
+import { addLottieClip, addTemplateClip, findClip, setAnimatedProps } from '../ops';
+import { getLottieEntry } from '../lottie-registry';
+import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
+import { TEMPLATE_DRAG_TYPE } from './MediaBin';
 import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
@@ -13,8 +16,9 @@ import { AspectMenu } from './AspectMenu';
 import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
 
 export const Preview: React.FC = () => {
-  const { state, mediaBase } = useEditor();
+  const { state, mediaBase, commit } = useEditor();
   const ov = usePreviewOverride();
+  const [dropOver, setDropOver] = useState(false);
   const project = ov ? ov.project : state.project;
   const ref = useRef<PlayerRef>(null);
   const duration = projectDuration(project);
@@ -93,7 +97,27 @@ export const Preview: React.FC = () => {
   return (
     <section className="preview">
       <div className="preview-stage">
-        <div className="preview-frame" style={{ aspectRatio: `${project.width} / ${project.height}` }}>
+        <div
+          className={`preview-frame${dropOver ? ' drop-over' : ''}`}
+          style={{ aspectRatio: `${project.width} / ${project.height}` }}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropOver(true); } }}
+          onDragLeave={() => setDropOver(false)}
+          onDrop={(e) => {
+            setDropOver(false);
+            const lid = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
+            const tid = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
+            if (!lid && !tid) return;
+            e.preventDefault();
+            clearPreview();
+            const at = playhead.frame;
+            if (lid) {
+              const en = getLottieEntry(lid);
+              if (en) commit((p) => { const r = addLottieClip(p, { id: en.id, name: en.name, data: en.data }, at); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; });
+            } else {
+              commit((p) => { const r = addTemplateClip(p, tid, at); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; });
+            }
+          }}
+        >
           <Player
             ref={ref}
             component={VidCutComposition}

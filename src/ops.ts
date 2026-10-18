@@ -4,7 +4,7 @@ import type { CaptionStyle, Clip, ClipColor, ClipTransform, KfEasing, KfProp, Lo
 import { lottieInfo } from '../shared/lottie';
 import { captionText, retimeWords, sliceCaption } from '../shared/captions';
 import { clipSpeed } from '../shared/types';
-import { getTransform, isDefaultTransform } from '../shared/transform';
+import { DEFAULT_TRANSFORM, getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
 import { getTemplate } from '../shared/templates';
 import { templateDefaults } from '../shared/template-api';
@@ -642,6 +642,18 @@ export function addTemplateClip(
   return { project, clipId: clip.id };
 }
 
+/**
+ * Pista de vídeo livre em [start, start+duration) que fique POR CIMA de tudo o que já se vê nesse intervalo
+ * (para uma sobreposição nunca ficar escondida atrás de um vídeo). Sem nenhuma → undefined (cria-se uma nova).
+ */
+export function overlayTrack(p: Project, start: number, duration: number): Track | undefined {
+  const video = p.tracks.map((t, i) => ({ t, i })).filter(({ t }) => t.kind === 'video');
+  const occupied = video.filter(({ t }) => overlaps(t, start, duration).length > 0).map(({ i }) => i);
+  const limit = occupied.length ? Math.min(...occupied) : Infinity; // índice 0 = pista de cima
+  const free = video.filter(({ t, i }) => i < limit && overlaps(t, start, duration).length === 0);
+  return free.length ? free[free.length - 1].t : undefined;
+}
+
 /** Adiciona uma animação Lottie (embute os dados no projeto) */
 export function addLottieClip(
   p: Project, asset: LottieAsset, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean } = {},
@@ -650,7 +662,7 @@ export function addLottieClip(
   const duration = Math.max(Math.round(p.fps), Math.round(info.durationSec * p.fps));
   let project: Project = { ...p, lotties: { ...p.lotties, [asset.id]: p.lotties?.[asset.id] ?? asset } };
   let track = opts.trackId ? project.tracks.find((t) => t.id === opts.trackId && t.kind === 'video') : undefined;
-  if (!track && !opts.newTrack) track = project.tracks.find((t) => t.kind === 'video' && overlaps(t, start, duration).length === 0);
+  if (!track && !opts.newTrack) track = overlayTrack(project, start, duration);
   if (!track) {
     const r = addTrack(project, 'video', true);
     project = r.project;
@@ -661,6 +673,8 @@ export function addLottieClip(
     id: uid('c'), mediaId: '', start: freeStart(track, desired, duration), duration,
     trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0,
     lottie: { assetId: asset.id, loop: false },
+    // entra como elemento por cima do vídeo (não em ecrã inteiro), para se ver e mexer com o rato
+    transform: { ...DEFAULT_TRANSFORM, scale: 0.45 },
   };
   project = mapTrack(project, track.id, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
   return { project, clipId: clip.id };

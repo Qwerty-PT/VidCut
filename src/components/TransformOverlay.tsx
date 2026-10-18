@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
 import { useFrame, playhead } from '../playhead';
 import { findClip, setAnimatedProps } from '../ops';
@@ -6,6 +6,7 @@ import { animatedTransform } from '../../shared/keyframes';
 import { clamp } from '../util';
 import { baseSize, getTransform } from '../../shared/transform';
 import type { MediaItem } from '../../shared/types';
+import { clipLottie, lottieMedia } from '../../shared/lottie';
 
 const SNAPS = [50, 100 / 3, 200 / 3];
 
@@ -22,7 +23,9 @@ export const TransformOverlay: React.FC = () => {
   const clip = sel?.clip;
   const media: MediaItem | undefined = clip?.template
     ? { id: '', path: '', name: '', kind: 'image', durationSec: 0, width: project.width, height: project.height }
+    : clip?.lottie ? lottieMedia(clipLottie(project, clip))
     : clip ? project.media.find((m) => m.id === clip.mediaId) : undefined;
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   if (!clip || !sel || sel.track.kind !== 'video' || !media || media.kind === 'audio') return null;
   if (frame < clip.start || frame >= clip.start + clip.duration) return null;
 
@@ -38,6 +41,15 @@ export const TransformOverlay: React.FC = () => {
         t={t}
         base={base}
         W={project.width}
+        onWheel={(e) => {
+          // roda do rato por cima da caixa: zoom (um só passo no histórico por "rajada")
+          e.preventDefault();
+          if (!wheelTimer.current) dispatch({ type: 'beginGesture' });
+          else clearTimeout(wheelTimer.current);
+          wheelTimer.current = setTimeout(() => { wheelTimer.current = null; dispatch({ type: 'endGesture' }); }, 350);
+          const s = clamp(t.scale * Math.pow(1.0012, -e.deltaY), 0.05, 10);
+          dispatch({ type: 'gesture', fn: (p) => setAnimatedProps(p, clip.id, rel, { scale: s }) });
+        }}
         onGesture={(kind, layer, e) => {
           if (e.button !== 0) return;
           e.preventDefault();
@@ -94,7 +106,19 @@ const Box: React.FC<{
   base: { w: number; h: number };
   W: number;
   onGesture: (kind: 'move' | 'scale' | 'rotate', layer: HTMLElement, e: React.PointerEvent) => void;
-}> = ({ t, base, W, onGesture }) => {
+  onWheel: (e: WheelEvent) => void;
+}> = ({ t, base, W, onGesture, onWheel }) => {
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const wheelRef = useRef(onWheel);
+  wheelRef.current = onWheel;
+  // wheel com passive:false (o React regista-o passivo e não deixa impedir o scroll)
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => wheelRef.current(e);
+    el.addEventListener('wheel', h, { passive: false });
+    return () => el.removeEventListener('wheel', h);
+  });
   const [k, setK] = useState(0); // px de ecrã por px do projeto
   const c = t.crop;
   // retângulo visível (recortado) em coordenadas locais, já com escala e espelho
@@ -112,10 +136,11 @@ const Box: React.FC<{
     >
       {k > 0 && (
         <div
+          ref={boxRef}
           className="tf-box"
           style={{ left: x0, top: y0, width: Math.max(4, x1 - x0), height: Math.max(4, y1 - y0) }}
           onPointerDown={(e) => onGesture('move', layerOf(e.currentTarget), e)}
-          title="Arrasta para mover · cantos para redimensionar · pega de cima para rodar (Shift: de 15 em 15°)"
+          title="Arrasta para mover · cantos ou roda do rato para redimensionar · pega de cima para rodar (Shift: de 15 em 15°)"
         >
           {(['nw', 'ne', 'sw', 'se'] as const).map((h) => (
             <div key={h} className={`tf-handle ${h}`} onPointerDown={(e) => onGesture('scale', layerOf(e.currentTarget), e)} />
