@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, continueRender, delayRender, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { Clip, ClipColor, CompositionProps, LottieAsset, MediaItem, Track } from './types';
 import { clipSpeed, mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
@@ -13,6 +13,20 @@ import { baseSize, mediaStyle } from './transform';
 import { animatedTransform } from './keyframes';
 import { getTemplate } from './templates';
 import { TemplateDurationContext } from './template-api';
+import { fontFaceCss, userFontFamily, type FontAsset } from './userfonts';
+
+/** Fontes próprias do projeto: injeta o @font-face e espera que carreguem antes de desenhar */
+const ProjectFonts: React.FC<{ fonts?: Record<string, FontAsset> }> = ({ fonts }) => {
+  const css = React.useMemo(() => fontFaceCss(fonts), [fonts]);
+  const ids = React.useMemo(() => Object.keys(fonts ?? {}).sort().join(','), [fonts]);
+  React.useLayoutEffect(() => {
+    if (!ids || typeof document === 'undefined' || !document.fonts) return;
+    const handle = delayRender('Fontes do projeto');
+    const loads = ids.split(',').map((id) => document.fonts.load(`40px "${userFontFamily(id)}"`).catch(() => undefined));
+    Promise.all(loads).finally(() => continueRender(handle));
+  }, [ids, css]);
+  return css ? <style>{css}</style> : null;
+};
 
 
 const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
@@ -178,9 +192,16 @@ const VisualClip: React.FC<{
   }
 
   if (!media) return null;
+  // fundo desfocado: o mesmo vídeo/imagem a encher o quadro, ampliado e desfocado, por baixo do clip
+  const blurPx = clip.bgBlur ? (8 + clip.bgBlur * 0.72) * (H / 1080) : 0;
+  const bgStyle: React.CSSProperties = {
+    position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+    transform: 'scale(1.12)', filter: [`blur(${blurPx}px)`, 'brightness(0.82)', colorFilter(clip.color, H) ?? ''].join(' ').trim(),
+  };
   if (media.kind === 'image') {
     return (
       <Layer look={look} id={clip.id}>
+        {blurPx > 0 && <AbsoluteFill style={{ overflow: 'hidden' }}><Img src={src} style={bgStyle} /></AbsoluteFill>}
         {frameBox(<Img src={src} style={fill} />)}
       </Layer>
     );
@@ -198,6 +219,13 @@ const VisualClip: React.FC<{
 
   return (
     <Layer look={look} id={clip.id}>
+      {blurPx > 0 && (
+        <AbsoluteFill style={{ overflow: 'hidden' }}>
+          <Sequence from={mainFrom} durationInFrames={mainDur} layout="none">
+            <OffthreadVideo src={src} trimBefore={mainTrim > 0 ? mainTrim : undefined} muted playbackRate={sp} style={bgStyle} />
+          </Sequence>
+        </AbsoluteFill>
+      )}
       {frameBox(<>
       {pre > 0 && !preReal && (
         <Sequence from={0} durationInFrames={pre} layout="none">
@@ -248,6 +276,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
 
   return (
     <AbsoluteFill style={{ backgroundColor: project.background }}>
+      <ProjectFonts fonts={project.fonts} />
       {ordered.map((track) =>
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);

@@ -54,6 +54,13 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Zoom pela régua do tempo:** clicar move a agulha, arrastar ↔ faz scrub, arrastar ↕ aproxima (para cima) ou afasta (para baixo) centrado no ponto clicado, duplo clique ajusta ao projeto. Cursor de relógio com setas na régua e lupa durante o zoom
 
+- **Congelar fotograma:** botão ❄ na barra da timeline (ou botão direito num clip de vídeo → Congelar fotograma). Extrai o fotograma da agulha (ffmpeg, PNG em `fotogramas/` na pasta de dados da app), divide o clip e mete a imagem 3 s a seguir, com o mesmo enquadramento, cor e fundo desfocado; o resto da pista anda para a frente
+- **Gravar narração:** botão do microfone na barra da timeline. Mostra o nível do microfone, "Silenciar o projeto" (por defeito ligado, para não gravar o som do vídeo), conta 3 s e grava com o vídeo a tocar desde a agulha; Espaço ou Parar termina, Esc cancela. A gravação fica em `gravacoes/` na pasta de dados (WAV mono 48 kHz) e entra numa pista de áudio livre exatamente onde começou (ou numa nova). No Mac, a primeira vez pede acesso ao microfone
+- **Fundo desfocado:** em Enquadrar, "Fundo desfocado" com intensidade — o próprio vídeo/imagem a encher o quadro, ampliado e desfocado, por baixo do clip (com "Caber inteiro"). Igual na pré-visualização e no export
+- **Contorno e brilho no texto:** cor e espessura do contorno (por fora das letras) e cor e intensidade do brilho; somam-se à sombra e funcionam nas legendas
+- **Fontes próprias:** no texto, Fonte → "Mais fontes…" (ou a lupa): lista as fontes do computador com pesquisa pelo nome, pré-visualização e todas as variantes (Bold, Italic…), ou "Importar ficheiro…" (.ttf .otf .woff .woff2). A fonte fica **embutida no projeto** (funciona no export e noutro computador; máx. 8 MB por fonte; ao guardar saem as que já não se usam). Variantes dentro de coleções `.ttc` do Mac são separadas automaticamente
+- **Guias das redes (zonas seguras):** botão "Guias" por baixo do ecrã: TikTok, Instagram Reels, YouTube Shorts (zonas tapadas pela interface, botões e descrição) ou margens de título (90/80%). Só na pré-visualização
+
 - **Atualizações automáticas:** na app instalada, procura versões novas nas Releases do GitHub uns segundos depois de abrir (no máximo uma vez por dia) e em **Ajuda → Procurar atualizações** (no Mac também em VidCut → Procurar atualizações). Aviso no canto com as novidades: **Atualizar** descarrega (com progresso e verificação de tamanho/SHA-256), **Reiniciar e instalar** fecha, substitui e volta a abrir; o projeto aberto fica na gravação automática. "Saltar esta versão" deixa de avisar dessa versão
   - macOS: descarrega o `.zip` e substitui a VidCut.app (funciona sem certificado Apple; a app tem de estar numa pasta onde possas escrever, ex.: Aplicações)
   - Windows: corre o instalador em modo silencioso e reabre (a versão portátil abre a página para descarregar)
@@ -228,7 +235,6 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
   - Lotties usados ficam embutidos no próprio ficheiro do projeto (são pequenos) — abre noutro computador mesmo sem a animação na biblioteca de lá; ao abrir, oferece acrescentá-la à biblioteca local
   - Modelos próprios em falta no outro computador: aviso claro (nome do modelo) e o clip mantém-se, pronto a voltar quando o modelo for instalado
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
-- **Fundo desfocado** (como o CapCut): ao mudar de formato (ex.: 16:9 → 9:16), encher as barras com uma versão desfocada e ampliada do próprio vídeo — opção do projeto ou por clip, com intensidade do desfoque
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export
 - **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada

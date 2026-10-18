@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('vidcut', {
     ipcRenderer.on('export:progress', h);
     return () => ipcRenderer.removeListener('export:progress', h);
   },
+  micAccess: () => ipcRenderer.invoke('mic:access'),
+  saveRecording: (bytes, mime) => ipcRenderer.invoke('recording:save', { bytes, mime }),
+  extractFrame: (file, timeSec) => ipcRenderer.invoke('frame:extract', { file, timeSec }),
+  fontsImport: () => ipcRenderer.invoke('fonts:import'),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateDownload: () => ipcRenderer.invoke('update:download'),
   updateCancel: () => ipcRenderer.invoke('update:cancel'),

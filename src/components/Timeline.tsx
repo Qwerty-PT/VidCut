@@ -1,19 +1,21 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { FREEZE_SEC, addMedia, freezeFrame, sourceTimeAt, addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
 import { getLottieEntry } from '../lottie-registry';
 import { openCaptions } from '../captions-ui';
 import { getTemplateTheme } from '../template-theme';
 import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
-import { getThumb, onThumbsChange } from '../media';
+import { getThumb, onThumbsChange, probeMedia } from '../media';
+import { api } from '../api';
 import { clamp, isTyping, timecode } from '../util';
 import { projectDuration, type Clip, type Keyframe, type MediaItem, type Project, type Track } from '../../shared/types';
 import { MEDIA_DRAG_TYPE, TEMPLATE_DRAG_TYPE } from './MediaBin';
 import { getTemplate } from '../../shared/templates';
 import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
+import { NarrationButton, NarrationPanel } from './Narration';
 import { usePeaks, wavePath } from '../peaks';
 import { clipSpeed } from '../../shared/types';
 
@@ -55,7 +57,39 @@ function niceStep(pps: number, fps: number): number {
 }
 
 export const Timeline: React.FC = () => {
-  const { state, dispatch, commit, importPaths } = useEditor();
+  const { state, dispatch, commit, importPaths, mediaBase, notify } = useEditor();
+
+  const [narr, setNarr] = useState(false);
+  /** Clip de vídeo a congelar: o selecionado (se estiver na agulha) ou o de cima que está na agulha */
+  const freezeTarget = (preferId?: string): Clip | null => {
+    const at = playhead.frame;
+    const isVid = (c: Clip) => state.project.media.find((m) => m.id === c.mediaId)?.kind === 'video' && at >= c.start && at < c.start + c.duration;
+    const ids = preferId ? [preferId] : state.selection;
+    for (const id of ids) { const f = findClip(state.project, id); if (f && isVid(f.clip)) return f.clip; }
+    if (preferId) return null;
+    for (const t of state.project.tracks) { if (t.kind !== 'video' || t.hidden) continue; const c = t.clips.find(isVid); if (c) return c; }
+    return null;
+  };
+  const doFreeze = async (preferId?: string) => {
+    const clip = freezeTarget(preferId);
+    if (!clip) { notify('Põe a agulha por cima de um clip de vídeo para congelar o fotograma.', 'error'); return; }
+    const media = state.project.media.find((m) => m.id === clip.mediaId)!;
+    const at = playhead.frame;
+    const t = sourceTimeAt(state.project, clip.id, at) ?? 0;
+    const r = await api().extractFrame(media.path, t);
+    if (!r.path) { notify(r.error || 'Não foi possível congelar o fotograma.', 'error'); return; }
+    let item: MediaItem;
+    try { item = await probeMedia(r.path, mediaBase); } catch (e) { notify(String((e as Error).message || e), 'error'); return; }
+    item = { ...item, name: `Congelado · ${media.name}` };
+    const dur = Math.round(FREEZE_SEC * state.project.fps);
+    commit((p) => {
+      const p1 = addMedia(p, [item]);
+      const mid = p1.media.find((m) => m.path === item.path)!.id;
+      const res = freezeFrame(p1, clip.id, at, mid, dur);
+      return { project: res.project, select: res.clipId ? [res.clipId] : undefined };
+    });
+    notify(`Fotograma congelado durante ${FREEZE_SEC} s. Estica ou encolhe a imagem na timeline.`);
+  };
   const { project, selection } = state;
   const fps = project.fps;
   const [pps, setPps] = useState(60);
@@ -494,6 +528,7 @@ export const Timeline: React.FC = () => {
 
   return (
     <section className="timeline">
+      {narr && <NarrationPanel onClose={() => setNarr(false)} />}
       <div className="tl-toolbar">
         <div className="tl-tools">
           <button className="icon-btn" title="Desfazer (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" /></button>
@@ -502,7 +537,10 @@ export const Timeline: React.FC = () => {
           <button className="icon-btn" title="Dividir na cabeça de leitura (S)" onClick={() => { const r = splitAtPlayhead(project, selection); if (r) commit(() => r); }}><Icon name="split" /></button>
           <button className="icon-btn" title="Eliminar à esquerda da cabeça de leitura (Q)" onClick={() => { const r = cutAtPlayhead(project, selection, 'left'); if (r) { commit(() => r.project); playhead.seek(r.seekTo); } }}><Icon name="cutLeft" /></button>
           <button className="icon-btn" title="Eliminar à direita da cabeça de leitura (W)" onClick={() => { const r = cutAtPlayhead(project, selection, 'right'); if (r) commit(() => r.project); }}><Icon name="cutRight" /></button>
+          <button className="icon-btn" title={`Congelar fotograma na agulha (${FREEZE_SEC} s)`} onClick={() => doFreeze()}><Icon name="freeze" /></button>
           <button className="icon-btn" title="Apagar seleção (Delete)" disabled={!selection.length} onClick={() => commit((p) => deleteClips(p, selection), [])}><Icon name="trash" /></button>
+          <span className="sep" />
+          <NarrationButton active={narr} onOpen={() => setNarr((v) => !v)} />
           <span className="sep" />
           <button className={`icon-btn${snap ? ' on' : ''}`} title="Íman: encaixar em clips e na cabeça de leitura" onClick={() => setSnap(!snap)}><Icon name="magnet" /></button>
           <span className="sep" />
@@ -594,6 +632,11 @@ export const Timeline: React.FC = () => {
             <button role="menuitem" disabled={!under} onPointerDown={run(() => { const r = cutAtPlayhead(project, [menu.clipId], 'right'); if (r) commit(() => r.project); })}>
               <Icon name="cutRight" size={15} /> Dividir e eliminar à direita <kbd>W</kbd>
             </button>
+            {project.media.find((x) => x.id === f.clip.mediaId)?.kind === 'video' && (
+              <button role="menuitem" disabled={!(playhead.frame >= f.clip.start && playhead.frame < f.clip.start + f.clip.duration)} onPointerDown={run(() => { void doFreeze(menu.clipId); })}>
+                <Icon name="freeze" size={15} /> Congelar fotograma ({FREEZE_SEC} s)
+              </button>
+            )}
             {canDetachAudio(project, menu.clipId) && (
               <button role="menuitem" onPointerDown={run(() => commit((p) => { const r = detachAudio(p, menu.clipId); return { project: r.project, select: r.clipId ? [r.clipId] : undefined }; }))}>
                 <Icon name="unlink" size={15} /> Separar áudio

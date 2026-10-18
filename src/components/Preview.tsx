@@ -14,6 +14,7 @@ import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
 import { AspectMenu } from './AspectMenu';
+import { SafeZoneMenu, SafeZoneOverlay } from './SafeZones';
 import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
 
 export const Preview: React.FC = () => {
@@ -138,6 +139,7 @@ export const Preview: React.FC = () => {
             outFrame={ov ? Math.max(Math.min(ov.from, duration - 1) + 1, Math.min(ov.to, duration - 1)) : null}
             loop={!!ov}
           />
+          <SafeZoneOverlay width={project.width} height={project.height} />
           {ov ? (
             <div className="preview-badge" role="status">
               <span className="dot" /> Pré-visualização · {ov.label}
@@ -172,6 +174,7 @@ const Transport: React.FC<{ duration: number; fps: number }> = ({ duration, fps 
         <button className="icon-btn" title="Fim (End)" onClick={() => playhead.seek(duration - 1)}><Icon name="end" /></button>
       </div>
       <div className="transport-right">
+        <SafeZoneMenu />
         <AspectMenu />
         <span className="tc dim">{timecode(duration, fps)}</span>
       </div>

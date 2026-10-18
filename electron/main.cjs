@@ -1,10 +1,10 @@
 // Processo principal do VidCut (Electron).
-const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, Menu, session, systemPreferences } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { createMediaServer } = require('./media-server.cjs');
 const { renderProject } = require('./render.cjs');
-const { getPeaks } = require('./peaks.cjs');
+const { getPeaks, ffmpegPath } = require('./peaks.cjs');
 const { createLottieLibrary } = require('./lottie-lib.cjs');
 const { transcribeMedia, captionsStatus } = require('./captions.cjs');
 const { createUpdater } = require('./updater.cjs');
@@ -298,6 +298,76 @@ ipcMain.handle('edit:native', (_e, action) => {
 
 ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
 
+// ---------- Congelar imagem: extrai um fotograma para PNG ----------
+ipcMain.handle('frame:extract', async (_e, { file, timeSec }) => {
+  const { spawn } = require('node:child_process');
+  const dir = path.join(app.getPath('userData'), 'fotogramas');
+  await fs.mkdir(dir, { recursive: true });
+  const base = path.basename(file).replace(/\.[^.]+$/, '').replace(/[^\w\-À-ÿ ]+/g, '_').slice(0, 60);
+  const out = path.join(dir, `${base}-${Math.round(timeSec * 1000)}ms-${Date.now().toString(36)}.png`);
+  const { bin, env } = ffmpegPath();
+  const t = Math.max(0, Number(timeSec) || 0);
+  const run = (args) => new Promise((resolve) => {
+    const pr = spawn(bin, args, { env });
+    let err = '';
+    pr.stderr.on('data', (d) => { err += d; });
+    pr.on('close', (code) => resolve({ code, err }));
+    pr.on('error', (e) => resolve({ code: -1, err: e.message }));
+  });
+  // -ss antes do -i é rápido; muito perto do fim pode não haver fotograma → recua um pouco
+  let r = await run(['-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-y', out]);
+  if (r.code !== 0 || !(await fs.stat(out).catch(() => null))) r = await run(['-v', 'error', '-ss', Math.max(0, t - 0.1).toFixed(3), '-i', file, '-frames:v', '1', '-y', out]);
+  if (!(await fs.stat(out).catch(() => null))) return { error: (r.err || 'Não foi possível extrair o fotograma.').trim().slice(0, 300) };
+  mediaServer.register([out]);
+  return { path: out };
+});
+
+// ---------- Narração: microfone e gravação ----------
+ipcMain.handle('mic:access', async () => {
+  if (process.platform !== 'darwin') return true;
+  const st = systemPreferences.getMediaAccessStatus('microphone');
+  if (st === 'granted') return true;
+  if (st === 'denied' || st === 'restricted') return false;
+  return systemPreferences.askForMediaAccess('microphone');
+});
+ipcMain.handle('recording:save', async (_e, { bytes, mime }) => {
+  const { spawn } = require('node:child_process');
+  const dir = path.join(app.getPath('userData'), 'gravacoes');
+  await fs.mkdir(dir, { recursive: true });
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}.${String(d.getSeconds()).padStart(2, '0')}`;
+  const raw = path.join(dir, `Narração ${stamp}.${/mp4/.test(mime || '') ? 'm4a' : 'webm'}`);
+  await fs.writeFile(raw, Buffer.from(bytes));
+  // WAV: duração exata e lido em todo o lado (o webm do gravador não traz duração)
+  const wav = raw.replace(/\.[^.]+$/, '.wav');
+  const { bin, env } = ffmpegPath();
+  const ok = await new Promise((resolve) => {
+    const pr = spawn(bin, ['-v', 'error', '-i', raw, '-ac', '1', '-ar', '48000', '-c:a', 'pcm_s16le', '-y', wav], { env });
+    pr.on('close', (code) => resolve(code === 0));
+    pr.on('error', () => resolve(false));
+  });
+  const out = ok ? wav : raw;
+  if (ok) await fs.rm(raw, { force: true });
+  mediaServer.register([out]);
+  return { path: out };
+});
+
+// ---------- Fontes próprias ----------
+ipcMain.handle('fonts:import', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Importar fonte',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Fontes', extensions: ['ttf', 'otf', 'woff', 'woff2'] }],
+  });
+  if (r.canceled) return [];
+  const out = [];
+  for (const f of r.filePaths) {
+    const buf = await fs.readFile(f);
+    out.push({ name: path.basename(f).replace(/\.[^.]+$/, ''), file: path.basename(f), size: buf.length, data: buf.toString('base64') });
+  }
+  return out;
+});
+
 // ---------- Atualizações ----------
 ipcMain.handle('update:check', () => updater.check({ manual: true }));
 ipcMain.handle('update:download', () => updater.downloadUpdate());
@@ -312,6 +382,13 @@ ipcMain.handle('update:install', async () => {
 app.setName('VidCut');
 app.whenReady().then(async () => {
   mediaBase = await mediaServer.listen();
+  // Permissões pedidas pela interface: microfone (narração) e fontes do sistema (texto). Mais nada.
+  const ALLOWED = new Set(['media', 'local-fonts']);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb, details) => {
+    if (process.env.VIDCUT_DEBUG_PERMS) console.log('[permissão]', permission, JSON.stringify(details?.mediaTypes || ''));
+    cb(ALLOWED.has(permission) && (permission !== 'media' || !(details?.mediaTypes || []).includes('video')));
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED.has(permission));
   buildMenu();
   createWindow();
   // procura atualizações uns segundos depois de abrir (no máximo uma vez por dia)

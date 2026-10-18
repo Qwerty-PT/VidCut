@@ -17,6 +17,7 @@ import { ExportOptionsModal, loadExportOptions } from './components/ExportOption
 import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '../shared/export';
 import { changeFps } from './ops';
 import { pruneLotties } from '../shared/lottie';
+import { pruneFonts } from '../shared/userfonts';
 import { CaptionsModal } from './components/CaptionsModal';
 import { ProjectSettingsModal } from './components/ProjectSettings';
 import { openProjectSettings, useProjectSettingsOpen } from './project-settings-ui';
@@ -144,7 +145,7 @@ export const App: React.FC = () => {
 
   const doSave = async (saveAs = false) => {
     const s = stateRef.current;
-    const path = await api().saveProject(pruneLotties(s.project), s.filePath, saveAs);
+    const path = await api().saveProject(pruneFonts(pruneLotties(s.project)), s.filePath, saveAs);
     if (path) { dispatch({ type: 'saved', filePath: path }); notify('Projeto guardado'); }
   };
 

@@ -56,6 +56,8 @@ export interface Clip {
   caption?: CaptionData;
   /** Animação Lottie (os dados ficam embutidos em project.lotties) */
   lottie?: { assetId: string; loop: boolean };
+  /** Fundo desfocado: enche as barras com o próprio vídeo/imagem ampliado e desfocado (1..100; ausente = desligado) */
+  bgBlur?: number;
 }
 
 export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
@@ -119,7 +121,8 @@ export type TextFont = 'sans' | 'serif' | 'mono';
 
 export interface TextContent {
   text: string;
-  font: TextFont;
+  /** Plex embutida ('sans' | 'serif' | 'mono') ou fonte do projeto ('font:<id>') */
+  font: TextFont | `font:${string}`;
   /** Tamanho em px numa referência de 1080 px de altura */
   size: number;
   weight: 400 | 600 | 700;
@@ -135,6 +138,10 @@ export interface TextContent {
   /** Opacidade da caixa de fundo, 0..1 (por defeito 0,85) */
   bgOpacity?: number;
   shadow: boolean;
+  /** Contorno à volta das letras (espessura em px numa referência de 1080 px; 0 ou ausente = sem contorno) */
+  stroke?: { color: string; width: number };
+  /** Brilho à volta das letras (tamanho em px numa referência de 1080 px) */
+  glow?: { color: string; size: number };
 }
 
 export type TransitionType = 'dissolve' | 'dip' | 'slide' | 'push' | 'wipe' | 'zoom'
@@ -196,6 +203,8 @@ export interface Project {
   tracks: Track[];
   /** Animações Lottie usadas, por id */
   lotties?: Record<string, LottieAsset>;
+  /** Fontes próprias usadas nos textos (embutidas), por id */
+  fonts?: Record<string, import('./userfonts').FontAsset>;
 }
 
 export interface CompositionProps {

@@ -1,7 +1,7 @@
 {
   "name": "vidcut",
   "productName": "VidCut",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Editor de vídeo simples com animações (Remotion + Electron)",
   "author": "Nuno Silva",
   "private": true,
@@ -98,7 +98,7 @@
       "gatekeeperAssess": false,
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "O VidCut não grava áudio.",
+        "NSMicrophoneUsageDescription": "O VidCut usa o microfone para gravar narrações por cima do vídeo.",
         "LSApplicationCategoryType": "public.app-category.video"
       }
     },

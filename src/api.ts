@@ -56,6 +56,10 @@ export interface VidCutApi {
   lottieRename(id: string, name: string): Promise<boolean>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
   onMenu(cb: (cmd: string) => void): () => void;
+  micAccess(): Promise<boolean>;
+  saveRecording(bytes: ArrayBuffer, mime: string): Promise<{ path: string }>;
+  extractFrame(file: string, timeSec: number): Promise<{ path?: string; error?: string }>;
+  fontsImport(): Promise<{ name: string; file: string; size: number; data: string }[]>;
   updateCheck(): Promise<void>;
   updateDownload(): Promise<void>;
   updateCancel(): Promise<void>;

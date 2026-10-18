@@ -13,12 +13,16 @@ import { LAYOUT_PRESETS, applyLayoutPreset, getTransform, isDefaultTransform } f
 import { ANIM_PRESETS } from '../../shared/anim';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 import { FONT_LABEL } from '../../shared/fonts';
+import { addFont, isUserFont, userFontFamily, userFontId, userFontKey } from '../../shared/userfonts';
+import { FontPicker } from './FontPicker';
 import { CAPTION_STYLES, toSrt } from '../../shared/captions';
 import { api } from '../api';
 
 /** Campos de edição de um clip de texto */
 export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, text }) => {
-  const { commit, dispatch } = useEditor();
+  const { commit, dispatch, state } = useEditor();
+  const [picker, setPicker] = React.useState(false);
+  const projectFonts = Object.values(state.project.fonts ?? {}).sort((a, b) => a.name.localeCompare(b.name, 'pt'));
   const frame = useFrame();
   const rel = Math.min(clip.duration - 1, Math.max(0, frame - clip.start));
   const kv = valuesAt(clip, rel);
@@ -39,12 +43,40 @@ export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, 
         />
       </label>
 
-      <div className="field-grid">
         <Row label="Fonte">
-          <select value={text.font} onChange={(e) => set({ font: e.target.value as TextContent['font'] })}>
-            {(Object.keys(FONT_LABEL) as TextContent['font'][]).map((f) => <option key={f} value={f}>{FONT_LABEL[f]}</option>)}
-          </select>
+          <div className="font-row">
+            <select
+              value={text.font}
+              style={{ fontFamily: isUserFont(text.font) ? `"${userFontFamily(userFontId(text.font))}"` : undefined }}
+              onChange={(e) => { if (e.target.value === '__more') setPicker(true); else set({ font: e.target.value as TextContent['font'] }); }}
+            >
+              <optgroup label="Incluídas">
+                {(Object.keys(FONT_LABEL) as (keyof typeof FONT_LABEL)[]).map((f) => <option key={f} value={f}>{FONT_LABEL[f]}</option>)}
+              </optgroup>
+              {projectFonts.length > 0 && (
+                <optgroup label="Neste projeto">
+                  {projectFonts.map((f) => <option key={f.id} value={userFontKey(f.id)}>{f.name}</option>)}
+                </optgroup>
+              )}
+              <option value="__more">Mais fontes…</option>
+            </select>
+            <button className="icon-btn" title="Procurar fontes do computador ou importar" onClick={() => setPicker(true)}><Icon name="search" size={15} /></button>
+          </div>
+          {picker && (
+            <FontPicker
+              onClose={() => setPicker(false)}
+              onPick={(fonts) => {
+                setPicker(false);
+                commit((p) => {
+                  let proj = p; let last = '';
+                  for (const f of fonts) { const r = addFont(proj, f); proj = r.project; last = r.id; }
+                  return updateText(proj, clip.id, { font: userFontKey(last) });
+                });
+              }}
+            />
+          )}
         </Row>
+      <div className="field-grid">
         <Row label="Cor">
           <div className="color-row">
             <input type="color" value={text.color} onChange={(e) => set({ color: e.target.value })} />
@@ -130,6 +162,32 @@ export const TextFields: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, 
           Sombra
         </label>
       </div>
+      <div className="field-grid">
+        <label className="check">
+          <input type="checkbox" checked={!!text.stroke && text.stroke.width > 0} onChange={(e) => set({ stroke: e.target.checked ? { color: text.stroke?.color ?? '#000000', width: text.stroke?.width || 6 } : undefined })} />
+          Contorno
+        </label>
+        {text.stroke && text.stroke.width > 0 && (
+          <input type="color" value={text.stroke.color} onChange={(e) => set({ stroke: { ...text.stroke!, color: e.target.value } })} aria-label="Cor do contorno" />
+        )}
+        <label className="check">
+          <input type="checkbox" checked={!!text.glow && text.glow.size > 0} onChange={(e) => set({ glow: e.target.checked ? { color: text.glow?.color ?? '#f2b33d', size: text.glow?.size || 24 } : undefined })} />
+          Brilho
+        </label>
+        {text.glow && text.glow.size > 0 && (
+          <input type="color" value={text.glow.color} onChange={(e) => set({ glow: { ...text.glow!, color: e.target.value } })} aria-label="Cor do brilho" />
+        )}
+      </div>
+      {text.stroke && text.stroke.width > 0 && (
+        <Row label="Espessura do contorno" hint={`${text.stroke.width} px`}>
+          <Range min={1} max={30} step={1} value={text.stroke.width} apply={(v) => (p) => updateText(p, clip.id, { stroke: { ...text.stroke!, width: v } })} />
+        </Row>
+      )}
+      {text.glow && text.glow.size > 0 && (
+        <Row label="Intensidade do brilho" hint={`${text.glow.size} px`}>
+          <Range min={4} max={80} step={1} value={text.glow.size} apply={(v) => (p) => updateText(p, clip.id, { glow: { ...text.glow!, size: v } })} />
+        </Row>
+      )}
       {text.background !== null && (
         <Row label="Opacidade da caixa" hint={`${Math.round((text.bgOpacity ?? 0.85) * 100)}%`}>
           <Range min={0} max={1} step={0.01} value={text.bgOpacity ?? 0.85} apply={(v) => (p) => updateText(p, clip.id, { bgOpacity: v })} />
@@ -261,6 +319,20 @@ export const TransformSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ c
       <Row label="Opacidade" hint={`${Math.round(t.opacity * 100)}%`}>
         <Range min={0} max={1} step={0.01} value={t.opacity} apply={(v) => anim({ opacity: v })} />
       </Row>
+      {media && (media.kind === 'video' || media.kind === 'image') && (
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!clip.bgBlur} onChange={(e) => commit((p) => updateClip(p, clip.id, { bgBlur: e.target.checked ? 50 : undefined }))} />
+            Fundo desfocado
+          </label>
+          {clip.bgBlur ? (
+            <Row label="Desfoque" hint={`${clip.bgBlur}%`}>
+              <Range min={1} max={100} step={1} value={clip.bgBlur} apply={(v) => (p) => updateClip(p, clip.id, { bgBlur: Math.round(v) })} />
+            </Row>
+          ) : null}
+          <p className="hint">Enche as barras com {media.kind === 'image' ? 'a própria imagem ampliada e desfocada' : 'o próprio vídeo ampliado e desfocado'} — ideal ao passar de 16:9 para 9:16. Usa "Caber inteiro".</p>
+        </div>
+      )}
       <details className="crop-box">
         <summary>Recorte</summary>
         {cropRange('top', 'Cima')}

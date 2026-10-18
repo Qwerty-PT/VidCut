@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { Clip, TextContent } from './types';
 import { animState, blockStyle, staggerProgress } from './anim';
-import { FONT_FAMILY } from './fonts';
+import { fontFamilyCss } from './userfonts';
 import { valuesAt } from './keyframes';
 import { activeWord } from './captions';
 import { easing } from './motion';
@@ -104,7 +104,15 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
     }
   }
 
-  const shadow = text.shadow ? `0 ${2 * k}px ${8 * k}px rgba(0,0,0,0.6)` : undefined;
+  // sombra e brilho somam-se; o contorno usa paint-order para ficar por fora das letras (não as come)
+  const shadows: string[] = [];
+  if (text.glow && text.glow.size > 0) {
+    const g = text.glow.size * k;
+    shadows.push(`0 0 ${g * 0.35}px ${text.glow.color}`, `0 0 ${g}px ${text.glow.color}`, `0 0 ${g * 2}px ${hexToRgba(text.glow.color, 0.6)}`);
+  }
+  if (text.shadow) shadows.push(`0 ${2 * k}px ${8 * k}px rgba(0,0,0,0.6)`);
+  const shadow = shadows.length ? shadows.join(', ') : undefined;
+  const sw = text.stroke && text.stroke.width > 0 ? text.stroke.width * k : 0;
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -123,7 +131,7 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
           style={{
             opacity: block.opacity,
             ...block.style,
-            fontFamily: FONT_FAMILY[text.font],
+            fontFamily: fontFamilyCss(text.font),
             fontWeight: text.weight,
             fontSize,
             lineHeight: 1.2,
@@ -132,6 +140,7 @@ export const TextLayer: React.FC<{ clip: Clip; text: TextContent }> = ({ clip, t
             whiteSpace: 'pre-wrap',
             overflowWrap: 'break-word',
             textShadow: shadow,
+            ...(sw ? { WebkitTextStroke: `${sw * 2}px ${text.stroke!.color}`, paintOrder: 'stroke fill' } : {}),
             background: text.background ? hexToRgba(text.background, text.bgOpacity ?? 0.85) : undefined,
             padding: text.background ? `${0.25 * fontSize}px ${0.45 * fontSize}px` : 0,
             borderRadius: text.background ? 0.18 * fontSize : 0,

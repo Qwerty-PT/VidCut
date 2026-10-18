@@ -816,3 +816,53 @@ export function pasteClips(p: Project, cb: ClipboardData, at: number): { project
   }
   return { project, created: fresh.map((f) => f.clip.id) };
 }
+
+/** Duração por defeito de uma imagem congelada */
+export const FREEZE_SEC = 3;
+
+/** Frame da fonte (em segundos) mostrado por um clip de vídeo num frame da timeline */
+export function sourceTimeAt(p: Project, clipId: string, frame: number): number | null {
+  const f = findClip(p, clipId);
+  if (!f) return null;
+  const rel = Math.min(f.clip.duration - 1, Math.max(0, frame - f.clip.start));
+  return (f.clip.trimStart + rel * clipSpeed(f.clip)) / p.fps;
+}
+
+/**
+ * Congela um fotograma: divide o clip na agulha, mete a imagem (`imageMediaId`) a seguir durante `duration`
+ * frames e empurra o resto da pista. A imagem herda enquadramento, cor e fundo desfocado do clip.
+ */
+export function freezeFrame(p: Project, clipId: string, frame: number, imageMediaId: string, duration: number): { project: Project; clipId: string | null } {
+  const f = findClip(p, clipId);
+  if (!f) return { project: p, clipId: null };
+  const { clip } = f;
+  const at = Math.min(clip.start + clip.duration, Math.max(clip.start, frame));
+  let project = at > clip.start && at < clip.start + clip.duration ? splitClips(p, [clipId], at).project : p;
+  const still: Clip = {
+    id: uid('c'), mediaId: imageMediaId, start: at, duration, trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0,
+    transform: clip.transform, color: clip.color, bgBlur: clip.bgBlur,
+  };
+  project = mapTrack(project, f.track.id, (t) => ({
+    ...t,
+    clips: sortClips([...t.clips.map((c) => (c.start >= at ? { ...c, start: c.start + duration } : c)), still]),
+  }));
+  return { project, clipId: still.id };
+}
+
+/** Pista de áudio livre no intervalo (ou uma nova, no fim das de áudio) — para a narração não empurrar nada */
+export function audioTrackFor(p: Project, start: number, duration: number): { project: Project; trackId: string } {
+  const free = p.tracks.find((t) => t.kind === 'audio' && !overlaps(t, start, duration).length);
+  if (free) return { project: p, trackId: free.id };
+  return addTrack(p, 'audio');
+}
+
+/** Põe um clip de media exatamente em `start`, numa pista de áudio livre */
+export function addAudioAt(p: Project, mediaId: string, start: number): { project: Project; clipId: string | null } {
+  const media = p.media.find((m) => m.id === mediaId);
+  if (!media) return { project: p, clipId: null };
+  const src = sourceFrames(media, p.fps);
+  const duration = Number.isFinite(src) ? Math.max(1, src) : p.fps;
+  const r = audioTrackFor(p, start, duration);
+  const clip: Clip = { id: uid('c'), mediaId, start, duration, trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0 };
+  return { project: mapTrack(r.project, r.trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) })), clipId: clip.id };
+}
