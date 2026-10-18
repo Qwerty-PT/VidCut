@@ -62,21 +62,21 @@ export const MediaBin: React.FC = () => {
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
-      <header className="panel-head bin-head">
-        <div className="bin-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'media'} className={tab === 'media' ? 'on' : ''} onClick={() => setTab('media')}>Media</button>
-          <button role="tab" aria-selected={tab === 'templates'} className={tab === 'templates' ? 'on' : ''} onClick={() => setTab('templates')}>Modelos</button>
-          <button role="tab" aria-selected={tab === 'lottie'} className={tab === 'lottie' ? 'on' : ''} onClick={() => setTab('lottie')}>Animações</button>
-          <button role="tab" aria-selected={tab === 'effects'} className={tab === 'effects' ? 'on' : ''} onClick={() => setTab('effects')}>Efeitos</button>
+      <nav className="bin-tabs" role="tablist" aria-label="Biblioteca">
+        {([['media', 'Media', 'film'], ['templates', 'Modelos', 'layers'], ['lottie', 'Animações', 'sparkle'], ['effects', 'Efeitos', 'wand']] as const).map(([id, label, icon]) => (
+          <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+            <Icon name={icon} size={18} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+      {tab === 'media' && (
+        <div className="bin-toolbar">
+          <button className="btn small" onClick={pick} title="Importar media (Ctrl+I)"><Icon name="import" size={14} /> Importar</button>
+          <button className="btn small rec" onClick={() => setRecOpen(true)} title="Gravar ecrã e câmara"><Icon name="record" size={12} /> Gravar</button>
         </div>
-        {tab === 'media' && (
-          <div className="bin-actions">
-            <button className="btn small icon-only" onClick={() => setRecOpen(true)} title="Gravar ecrã e câmara" aria-label="Gravar ecrã e câmara"><Icon name="record" size={14} /></button>
-            <button className="btn small icon-only" onClick={pick} title="Importar media (Ctrl+I)" aria-label="Importar media"><Icon name="import" size={16} /></button>
-          </div>
-        )}
-        {recOpen && <ScreenRecorder onClose={() => setRecOpen(false)} />}
-      </header>
+      )}
+      {recOpen && <ScreenRecorder onClose={() => setRecOpen(false)} />}
       {tab === 'effects' ? <EffectsLibrary /> : tab === 'lottie' ? <LottieLibrary /> : tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
         <button className="empty-drop" onClick={pick}>
           <Icon name="import" size={28} />

@@ -733,7 +733,7 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
     <div className={`tl-row kind-${track.kind}`} style={{ height: TRACK_H[track.kind] }} data-track-id={track.id} data-track-kind={track.kind}>
       <div className="tl-head" style={{ width: HEADER_W }}>
         <span className="tl-head-icon"><Icon name={isVideo ? 'film' : isText ? 'type' : 'music'} size={15} /></span>
-        <span className="tl-head-name">{track.name}</span>
+        <span className="tl-head-name" title={track.name}>{track.name}</span>
         <div className="tl-head-btns">
           {(isVideo || isText) && (
             <button className={`icon-btn mini${track.hidden ? ' off' : ''}`} title={track.hidden ? 'Mostrar pista' : 'Esconder pista'} onClick={() => onToggle({ hidden: !track.hidden })}>
@@ -746,7 +746,7 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
             </button>
           )}
           {track.clips.length === 0 && (isText || project.tracks.filter((t) => t.kind === track.kind).length > 1) && (
-            <button className="icon-btn mini" title="Remover pista vazia" onClick={onRemove}><Icon name="x" size={14} /></button>
+            <button className="icon-btn mini tl-head-rm" title="Remover pista vazia" onClick={onRemove}><Icon name="x" size={14} /></button>
           )}
         </div>
       </div>

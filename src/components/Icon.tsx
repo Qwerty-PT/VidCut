@@ -28,6 +28,8 @@ const P: Record<string, React.ReactNode> = {
   close: <><path d="M6 6l12 12M18 6L6 18" /></>,
   sparkle: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /></>,
   minus: <path d="M5 12h14" />,
+  layers: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></>,
+  wand: <><path d="M4 20L15 9" /><path d="M14 4v3M12.5 5.5h3M19 9v2M18 10h2M18 3.5l.8 1.6 1.7.4-1.2 1.2.3 1.8-1.6-.8-1.6.8.3-1.8-1.2-1.2 1.7-.4z" /></>,
   search: <><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></>,
   mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21" /></>,
   freeze: <><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" /><path d="M9.5 4.5L12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2" /></>,

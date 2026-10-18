@@ -2,6 +2,11 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.21.1
+
+- Separadores da biblioteca com ícone e nome (Media, Modelos, Animações, Efeitos) — já não ficam cortados; Importar e Gravar passam para uma barra no separador Media
+- Nomes das pistas sempre visíveis: o botão de remover uma pista vazia só aparece ao passar o rato
+
 ## 0.21.0
 
 - Biblioteca de efeitos (separador Efeitos): 20 efeitos em 5 grupos — Movimento (tremor, câmara na mão, pulsar, batida, zoom lento, balançar), Luz (brilho suave, fugas de luz, reflexo a passar, arco-íris, estroboscópio), Retro (VHS, película antiga, glitch, duotone), Partículas (neve, brilhos, bokeh) e Distorção (ondulação, foco a pulsar)

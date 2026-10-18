@@ -876,3 +876,26 @@ body.tl-zooming, body.tl-zooming * { cursor: url("data:image/svg+xml,%3Csvg%20xm
 .rec-count { font: 600 64px var(--mono); color: var(--amber); text-align: center; padding: 20px 0; }
 .rec-live-row { display: flex; justify-content: center; font-size: 15px; }
 .rec-saving { margin: 10px 0; text-align: center; color: var(--text-dim); }
+
+/* ---------- Separadores da biblioteca (ícone + nome, como o CapCut) ---------- */
+.media-bin .bin-tabs {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; height: auto; flex: none;
+  padding: 6px 6px 0; border-bottom: 1px solid var(--line-soft);
+}
+.media-bin .bin-tabs button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0;
+  height: 54px; padding: 4px 2px 6px; border: 0; border-radius: 7px 7px 0 0; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--text-faint); cursor: pointer; font: 500 11px var(--font);
+}
+.media-bin .bin-tabs button span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.media-bin .bin-tabs button:hover { color: var(--text); background: var(--raised); }
+.media-bin .bin-tabs button.on { color: var(--text); border-bottom-color: var(--amber); }
+.media-bin .bin-tabs button.on svg { color: var(--amber); }
+.bin-toolbar { display: flex; gap: 6px; padding: 8px 8px 0; flex: none; }
+.bin-toolbar .btn { flex: 1; justify-content: center; gap: 6px; }
+.bin-toolbar .btn.rec svg { color: var(--danger); }
+
+/* nomes das pistas: o × das pistas vazias só aparece ao passar o rato (não corta o nome) */
+.tl-head-btns .icon-btn.mini { width: 22px; height: 22px; }
+.tl-head-rm { display: none !important; }
+.tl-head:hover .tl-head-rm { display: grid !important; }
