@@ -37,7 +37,7 @@ export default defineTemplate({
 
 Tipos de campo: `text`, `textarea`, `color`, `number` (min/max), `select` (options), `boolean`, `image` (escolhe uma imagem do projeto).
 
-Categorias: `Títulos`, `Oráculos`, `Redes sociais`, `Dispositivos`, `Logótipo`, `Contagens`, `Dados`, `Listas`, `Apresentação`, `Fundos`, `Final`.
+Categorias: `Títulos`, `Oráculos`, `Redes sociais`, `Dispositivos`, `Logótipo`, `Contagens`, `Dados`, `Listas`, `Apresentação`, `Eventos`, `Fundos`, `Final`.
 
 ## Temas
 
@@ -57,3 +57,13 @@ A galeria e o separador **Modelo** têm chips de tema (Escuro, Claro, Vivo, Eleg
 - Usa sempre `fontOf(p, 'sans' | 'serif')` em vez de `FONT_FAMILY` para o modelo seguir a letra do tema (Elegante = serifada, Néon = mono com brilho).
 - Modelos transparentes sem campo `fundo` (oráculos, lembretes) ficam com texto claro em todos os temas, para se lerem por cima do vídeo.
 - Ficheiros `_*.tsx` servem para partilhar código entre modelos (ex.: `_dispositivo.tsx` para Telemóvel, Portátil e Browser).
+
+## Projetos verticais
+
+`k` (de `useTemplate`) é relativo à altura (1080p). Para um modelo que funcione bem também em 9:16, usa uma escala pelo lado menor e troca linhas por colunas quando o quadro é vertical:
+
+```tsx
+const { width, height } = useTemplate();
+const s = Math.min(width, height) / 1080;
+const vertical = height > width;
+```

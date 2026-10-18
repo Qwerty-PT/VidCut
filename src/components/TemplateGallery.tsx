@@ -66,7 +66,7 @@ export const TemplateGallery: React.FC = () => {
   const groups = useMemo(() => {
     const m = new Map<string, TemplateDef[]>();
     for (const t of TEMPLATES) m.set(t.category, [...(m.get(t.category) ?? []), t]);
-    const order = ['Títulos', 'Oráculos', 'Redes sociais', 'Dispositivos', 'Apresentação', 'Logótipo', 'Contagens', 'Dados', 'Listas', 'Fundos', 'Final'];
+    const order = ['Títulos', 'Oráculos', 'Redes sociais', 'Dispositivos', 'Apresentação', 'Eventos', 'Logótipo', 'Contagens', 'Dados', 'Listas', 'Fundos', 'Final'];
     return [...m.entries()].sort((a, b) => (order.indexOf(a[0]) + 99) % 99 - (order.indexOf(b[0]) + 99) % 99);
   }, []);
   const add = (id: string) =>

@@ -18,7 +18,7 @@ export type FieldDef =
   /** Imagem do projeto (o valor guardado é o id da media; o modelo recebe o URL ou '') */
   | { key: string; label: string; type: 'image'; default: '' };
 
-export type TemplateCategory = 'Títulos' | 'Oráculos' | 'Logótipo' | 'Contagens' | 'Dados' | 'Listas' | 'Redes sociais' | 'Dispositivos' | 'Apresentação' | 'Fundos' | 'Final';
+export type TemplateCategory = 'Títulos' | 'Oráculos' | 'Logótipo' | 'Contagens' | 'Dados' | 'Listas' | 'Redes sociais' | 'Dispositivos' | 'Apresentação' | 'Eventos' | 'Fundos' | 'Final';
 
 export interface TemplateDef {
   id: string;

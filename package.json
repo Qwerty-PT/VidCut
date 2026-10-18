@@ -1,7 +1,7 @@
 {
   "name": "vidcut",
   "productName": "VidCut",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Editor de vídeo simples com animações (Remotion + Electron)",
   "author": "Nuno Silva",
   "private": true,
@@ -21,6 +21,7 @@
     "@remotion/install-whisper-cpp": "^4.0.533",
     "@remotion/renderer": "4.0.533",
     "fflate": "^0.8.3",
+    "qrcode-generator": "^2.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "remotion": "4.0.533"
