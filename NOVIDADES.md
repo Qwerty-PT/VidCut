@@ -2,6 +2,14 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.24.0
+
+- Inverter clip: o vídeo (e o som) passa a andar para trás; "Pôr a direito" volta ao original
+- Máscaras: retângulo, círculo, linear, faixa, coração e estrela, com borda suave e inverter
+- Projetos portáteis: o projeto guarda caminhos relativos e reencontra sozinho os ficheiros quando a pasta muda de sítio; se faltar algum, procura numa pasta pelo nome e tamanho
+- Empacotar projeto: copia o projeto e só os ficheiros que usa para uma pasta, pronta a levar para outro computador
+- Proxies: cópias leves dos vídeos para a pré-visualização ficar fluida (4K, HEVC, computadores lentos); o export usa sempre os originais
+
 ## 0.23.0
 
 - Cortar silêncios: encontra as pausas na fala e corta-as, com pré-visualização das pausas e afinação (sensibilidade, pausa mínima, margem)

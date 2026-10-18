@@ -39,6 +39,7 @@ const P: Record<string, React.ReactNode> = {
   denoise: <><path d="M3 12c2-3 3 3 5 0s3 3 5 0 3 3 5 0 2 2 3 0" /><path d="M4 20L20 4" opacity=".6" /></>,
   duck: <><path d="M3 7h6l3 6h9" /><path d="M3 17h18" opacity=".45" /></>,
   replace: <><path d="M4 8h12l-3-3M20 16H8l3 3" /></>,
+  reverse: <><path d="M9 7H4V2" /><path d="M4.6 7A8 8 0 1 1 4 13" /></>,
   beat: <><path d="M3 12h3l2-6 3 12 3-9 2 3h5" /></>,
   scenes: <><rect x="3" y="5" width="7" height="14" rx="1.5" /><rect x="14" y="5" width="7" height="14" rx="1.5" /><path d="M12 3v18" strokeDasharray="2 2" /></>,
   smile: <><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 007 0" /><path d="M9 9.5h.01M15 9.5h.01" strokeWidth={2.6} /></>,

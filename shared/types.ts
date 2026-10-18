@@ -20,6 +20,9 @@ export interface MediaItem {
   bpm?: number;
   /** Som limpo pela redução de ruído: caminho do ficheiro original (para repor) */
   denoisedFrom?: string;
+  /** Caminho relativo à pasta do projeto (para abrir noutro computador) e tamanho do ficheiro (para o reencontrar) */
+  rel?: string;
+  size?: number;
 }
 
 export interface Clip {
@@ -73,6 +76,28 @@ export interface Clip {
   speedRamp?: SpeedRamp;
   /** Espaço de um modelo de projeto: mostra um quadro "põe aqui um vídeo/foto" até receber media */
   placeholder?: { label: string; accept: 'video' | 'image' | 'any'; field?: string };
+  /** Clip invertido: media e corte originais (para voltar a pôr a direito) */
+  reversed?: { mediaId: string; trimStart: number; duration: number };
+  /** Máscara: mostra só uma parte do clip */
+  mask?: ClipMask;
+}
+
+export type MaskShape = 'rect' | 'circle' | 'linear' | 'band' | 'heart' | 'star';
+export interface ClipMask {
+  shape: MaskShape;
+  /** Centro em % da caixa do clip */
+  x: number;
+  y: number;
+  /** Tamanho em % da caixa (faixa: só a altura conta) */
+  w: number;
+  h: number;
+  /** Graus */
+  rotation: number;
+  /** Suavidade da borda, 0..100 */
+  feather: number;
+  /** Cantos arredondados (retângulo), 0..100 */
+  round: number;
+  invert: boolean;
 }
 
 export interface RampPoint { u: number; s: number }

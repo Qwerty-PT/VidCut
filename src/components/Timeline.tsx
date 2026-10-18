@@ -19,9 +19,9 @@ import { cutAtPlayhead, splitAtPlayhead } from './Inspector';
 import { Icon } from './Icon';
 import { NarrationButton, NarrationPanel } from './Narration';
 import { usePeaks, wavePath } from '../peaks';
-import { addVolKey, allBeatFrames, clipBeatFrames, hasSound, moveVolKey, removeVolKey, addStickerClip } from '../ops';
+import { canUnreverse, addVolKey, allBeatFrames, clipBeatFrames, hasSound, moveVolKey, removeVolKey, addStickerClip } from '../ops';
 import { volumeAt } from '../../shared/volume';
-import { detectBeats, normalizeClips, splitOnBeats, splitScenes, syncToBeats, denoiseClip, duckMusic, replaceWithFile, replaceWithMedia, restoreOriginalSound } from '../analysis-ui';
+import { reverseClip, detectBeats, normalizeClips, splitOnBeats, splitScenes, syncToBeats, denoiseClip, duckMusic, replaceWithFile, replaceWithMedia, restoreOriginalSound } from '../analysis-ui';
 import { openModal } from '../modals';
 import { STICKER_DRAG_TYPE, getDraggedSticker } from './StickerLibrary';
 import { SOUND_DRAG_TYPE, getDraggedSound, addLibrarySound } from './SoundLibrary';
@@ -700,6 +700,9 @@ export const Timeline: React.FC = () => {
                   <button role="menuitem" onPointerDown={close(() => { void duckMusic(ctx, sel, 0.25); })} title="Usa este clip como música e baixa-o quando há voz nos outros"><Icon name="duck" size={15} /> Baixar quando há voz (ducking)</button>
                 </>
               )}
+              {m && m.kind !== 'image' && !clip.template && (
+                <button role="menuitem" onPointerDown={close(() => { void reverseClip({ ...ctx, mediaBase }, clip.id); })}><Icon name="reverse" size={15} /> {canUnreverse(clip) ? 'Pôr a direito' : 'Inverter (andar para trás)'}</button>
+              )}
               {m?.kind === 'video' && visual && (
                 <button role="menuitem" onPointerDown={close(() => { void splitScenes(ctx, clip.id); })}>
                   <Icon name="scenes" size={15} /> Dividir nas mudanças de cena
@@ -939,6 +942,8 @@ const ClipView: React.FC<{
       {clip.effects?.length && w > 70 ? <span className="clip-badge fx" title={clip.effects.map((x) => getEffect(x.id)?.name ?? x.id).join(', ')}>fx{clip.effects.length > 1 ? ` ${clip.effects.length}` : ''}</span> : null}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}
       {clip.speedRamp && w > 50 && <span className="clip-badge speed" title="Curva de velocidade">⤳ curva</span>}
+      {clip.reversed && w > 60 && <span className="clip-badge rev" title="Invertido (anda para trás)">↺</span>}
+      {clip.mask && w > 60 && <span className="clip-badge msk" title="Com máscara">◐</span>}
       {clip.keyframes?.map((kf) => (
         <div
           key={kf.id}

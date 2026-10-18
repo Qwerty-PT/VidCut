@@ -68,6 +68,23 @@ contextBridge.exposeInMainWorld('vidcut', {
     ipcRenderer.on('audio:progress', h);
     return () => ipcRenderer.removeListener('audio:progress', h);
   },
+  reverse: (o) => ipcRenderer.invoke('media:reverse', o),
+  onMediaProgress: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on('media:progress', h);
+    return () => ipcRenderer.removeListener('media:progress', h);
+  },
+  proxyStatus: (files) => ipcRenderer.invoke('proxy:status', files),
+  proxyMake: (items) => ipcRenderer.invoke('proxy:make', items),
+  proxyClear: () => ipcRenderer.invoke('proxy:clear'),
+  onProxyProgress: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on('proxy:progress', h);
+    return () => ipcRenderer.removeListener('proxy:progress', h);
+  },
+  relinkFolder: (missing) => ipcRenderer.invoke('media:relinkFolder', missing),
+  relinkFile: (name) => ipcRenderer.invoke('media:relinkFile', name),
+  packProject: (project) => ipcRenderer.invoke('project:pack', { project }),
   soundsList: () => ipcRenderer.invoke('sounds:list'),
   soundsUse: (file) => ipcRenderer.invoke('sounds:use', file),
   updateCheck: () => ipcRenderer.invoke('update:check'),

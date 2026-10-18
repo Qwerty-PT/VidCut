@@ -12,7 +12,8 @@ export interface CaptionsStatus { installed: boolean; models: Record<string, boo
 
 export interface LottieLibItem { id: string; name: string; data: Record<string, unknown> }
 
-export interface AutosaveData { project: Project; filePath: string | null; dirty: boolean }
+export interface MissingMedia { id: string; name: string; file: string; size: number | null; path: string }
+export interface AutosaveData { project: Project; filePath: string | null; dirty: boolean; missing?: MissingMedia[] }
 
 export interface UpdateStatus {
   status: 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
@@ -37,7 +38,7 @@ export interface VidCutApi {
   pickMedia(): Promise<string[]>;
   registerMedia(paths: string[]): Promise<boolean>;
   pathForFile(file: File): string;
-  openProject(): Promise<{ path: string; project: Project } | null>;
+  openProject(): Promise<{ path: string; project: Project; missing: MissingMedia[]; moved: number } | null>;
   saveProject(project: Project, filePath: string | null, saveAs: boolean): Promise<string | null>;
   autosaveWrite(data: AutosaveData): Promise<boolean>;
   autosaveRead(): Promise<AutosaveData | null>;
@@ -79,6 +80,15 @@ export interface VidCutApi {
   envelope(file: string, start: number, dur: number): Promise<{ hop: number; db: number[]; error?: string }>;
   denoise(file: string, strength: number): Promise<{ path?: string; error?: string }>;
   onAudioProgress(cb: (p: number) => void): () => void;
+  reverse(o: { file: string; start: number; dur: number; fps: number; kind: 'video' | 'audio'; hasAudio: boolean }): Promise<{ path?: string; error?: string }>;
+  onMediaProgress(cb: (p: { task: string; p: number }) => void): () => void;
+  proxyStatus(files: string[]): Promise<Record<string, string | null>>;
+  proxyMake(items: { file: string; dur: number }[]): Promise<boolean>;
+  proxyClear(): Promise<{ bytes: number }>;
+  onProxyProgress(cb: (p: { file: string; p: number; proxy?: string; error?: string }) => void): () => void;
+  relinkFolder(missing: MissingMedia[]): Promise<Record<string, string> | null>;
+  relinkFile(name: string): Promise<string | null>;
+  packProject(project: Project): Promise<{ dir: string; file: string; count: number; bytes: number; missing: string[]; error?: string } | null>;
   soundsList(): Promise<{ musicas: LibSound[]; efeitos: LibSound[] }>;
   soundsUse(file: string): Promise<{ path?: string; error?: string }>;
   updateCheck(): Promise<void>;

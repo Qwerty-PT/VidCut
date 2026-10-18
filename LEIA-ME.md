@@ -80,6 +80,12 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 - **Substituir media:** botão direito num clip → "Substituir media…" troca o ficheiro mantendo posição, duração, enquadramento, cor, efeitos e transições (um vídeo mais curto encurta o clip)
 - Duplo clique num som da biblioteca de media põe-no na agulha numa pista de áudio livre (antes ia para o fim da pista)
 
+- **Inverter clip:** botão "Inverter (andar para trás)" no painel (vídeo ou áudio) ou botão direito. Gera uma cópia invertida só do excerto usado (vídeo lido em blocos de 1 s e recodificado em H.264 de alta qualidade; som invertido), em `invertidos/` na pasta de dados, e põe-na no clip — fades e pontos de volume ficam espelhados, e o som separado do mesmo vídeo também é invertido. "Pôr a direito" volta ao original (enquanto o clip não for aparado ou dividido). Na timeline aparece ↺
+- **Máscaras:** em Enquadrar → Máscara: Retângulo (cantos redondos), Círculo, Linear, Faixa, Coração e Estrela, com posição, tamanho, rotação, suavidade da borda e "Inverter". A máscara acompanha o clip (posição, escala, rotação, keyframes) e funciona em vídeos, imagens, modelos, animações e stickers. Na timeline aparece ◐
+- **Projetos portáteis:** ao guardar, o projeto guarda também o caminho de cada ficheiro relativo ao `.vidcut` e o tamanho. Ao abrir, o que não estiver no sítio antigo procura-se pelo caminho relativo, ao lado do projeto e em `media/` — por isso uma pasta com o projeto e os vídeos pode ser movida, posta numa pen, no iCloud/Drive ou aberta noutro sistema. O que mesmo assim faltar aparece na janela **"Faltam ficheiros"**: "Procurar numa pasta…" procura nas subpastas pelo nome e tamanho, ou "Procurar…" um a um
+- **Empacotar projeto:** Ficheiro → Empacotar projeto (para outro computador)…: cria a pasta "<nome> (pacote)" com o `.vidcut` e uma pasta `media/` só com os ficheiros usados (também as imagens dentro de modelos); Lotties e fontes já vão dentro do projeto. Copia a pasta e abre o `.vidcut` noutro computador
+- **Proxies:** botão **Proxy** por baixo do ecrã (ou Ver → Usar proxies): cria em segundo plano cópias leves (540p, H.264 com GOP curto) dos vídeos em `proxies/` na pasta de dados e a pré-visualização passa a usá-las — fluida com 4K, HEVC ou em computadores lentos. O export usa sempre os originais. Progresso no botão e em cada vídeo da biblioteca ("P" quando pronto); vídeos novos ganham proxy sozinhos enquanto estiver ligado. Ver → Apagar os proxies… liberta o espaço
+
 - **Atualizações automáticas:** na app instalada, procura versões novas nas Releases do GitHub uns segundos depois de abrir (no máximo uma vez por dia) e em **Ajuda → Procurar atualizações** (no Mac também em VidCut → Procurar atualizações). Aviso no canto com as novidades: **Atualizar** descarrega (com progresso e verificação de tamanho/SHA-256), **Reiniciar e instalar** fecha, substitui e volta a abrir; o projeto aberto fica na gravação automática. "Saltar esta versão" deixa de avisar dessa versão
   - macOS: descarrega o `.zip` e substitui a VidCut.app (funciona sem certificado Apple; a app tem de estar numa pasta onde possas escrever, ex.: Aplicações)
   - Windows: corre o instalador em modo silencioso e reabre (a versão portátil abre a página para descarregar)
@@ -190,6 +196,8 @@ electron/
   preload.cjs        ponte segura window.vidcut
   media-server.cjs   servidor HTTP local (127.0.0.1) que serve só os ficheiros importados
   render.cjs         export com @remotion/renderer (corre também fora do Electron)
+  media-tools.cjs    clip invertido e proxies
+  portable.cjs       caminhos relativos, reencontrar ficheiros, empacotar projeto
   audio-analysis.cjs sonoridade, batidas, cenas, energia da fala e redução de ruído
 shared/
   types.ts           modelo de dados do projeto
@@ -198,6 +206,7 @@ shared/
   remotion-root.tsx  entrada do bundle de export
   volume.ts          volume ao longo do clip (keyframes de volume)
   speedramp.ts       curvas de velocidade (tabela tempo↔fonte, troços, presets)
+  mask.ts            máscaras (SVG usado como máscara CSS)
   speech.ts          fala e silêncio a partir da energia (cortar silêncios, ducking)
   stickers.tsx       stickers desenhados, emojis e as suas animações
 src/                 interface React
@@ -254,13 +263,6 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 
 ### Backlog
 
-- **Proxies (edição em baixa resolução):** cópias leves (ex. 540p/720p, H.264 com GOP curto) geradas em segundo plano ao importar ou a pedido; a pré-visualização usa o proxy, o export usa sempre o original. Interruptor "Usar proxies" na barra, indicador por ficheiro (a gerar / pronto), cache em userData/proxies e opção para apagar. Útil em computadores lentos e com vídeo 4K/HEVC (que o Chromium nem sempre pré-visualiza)
-- **Projetos portáteis (mudar de computador):**
-  - Caminhos relativos ao ficheiro do projeto (pasta do projeto + `media/`) — funciona com pen, iCloud, Drive, Dropbox e entre Mac/Windows/Linux
-  - Reencontrar ficheiros em falta ao abrir: escolher pasta, procura por nome + tamanho, um encontrado reencontra os restantes
-  - "Empacotar projeto": copia projeto + tudo o que usa (media, Lotties, modelos próprios da pasta `modelos/`) para uma pasta ou `.vidcutpack` (abre com duplo clique); opção "só proxies" para editar num portátil e exportar onde estão os originais
-  - Lotties usados ficam embutidos no próprio ficheiro do projeto (são pequenos) — abre noutro computador mesmo sem a animação na biblioteca de lá; ao abrir, oferece acrescentá-la à biblioteca local
-  - Modelos próprios em falta no outro computador: aviso claro (nome do modelo) e o clip mantém-se, pronto a voltar quando o modelo for instalado
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export

@@ -19,6 +19,10 @@ import { getEffect } from '../../shared/effects';
 import { removeEffect, setEffectIntensity } from '../ops';
 import { CAPTION_STYLES, toSrt } from '../../shared/captions';
 import { api } from '../api';
+import { MASK_SHAPES, defaultMask } from '../../shared/mask';
+import { setMask, canUnreverse } from '../ops';
+import { reverseClip } from '../analysis-ui';
+import type { ClipMask, MaskShape } from '../../shared/types';
 import { denoiseClip, duckMusic, replaceWithFile, restoreOriginalSound } from '../analysis-ui';
 import { openModal } from '../modals';
 import { RAMP_MAX, RAMP_MIN, RAMP_PRESETS, presetRamp, speedAtU, uAtRel } from '../../shared/speedramp';
@@ -906,5 +910,73 @@ export const PlaceholderSection: React.FC<{ clip: Clip }> = ({ clip }) => {
         <Icon name="import" size={16} /> Escolher {ph.accept === 'image' || ph.field ? 'foto' : ph.accept === 'video' ? 'vídeo' : 'vídeo ou foto'}…
       </button>
     </section>
+  );
+};
+
+// ---------- máscara ----------
+
+export const MaskSection: React.FC<{ clip: Clip; media: MediaItem }> = ({ clip, media }) => {
+  const { commit } = useEditor();
+  const m = clip.mask;
+  const aspect = (media.width && media.height) ? media.width / media.height : 16 / 9;
+  const set = (patch: Partial<ClipMask>) => (p: Project) => setMask(p, clip.id, { ...m!, ...patch });
+  const pct = (v: number) => `${Math.round(v)}%`;
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h3 className="section-title">Máscara</h3>
+        {m && <button className="btn tiny" onClick={() => commit((p) => setMask(p, clip.id, undefined))}>Tirar</button>}
+      </div>
+      <div className="mask-shapes">
+        <button className={`mask-shape${!m ? ' on' : ''}`} onClick={() => commit((p) => setMask(p, clip.id, undefined))} title="Sem máscara">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden><rect x="3" y="5" width="18" height="14" rx="2" className="ms-off" /></svg><span>Nenhuma</span>
+        </button>
+        {MASK_SHAPES.map((sh) => (
+          <button key={sh.value} className={`mask-shape${m?.shape === sh.value ? ' on' : ''}`} title={sh.label}
+            onClick={() => commit((p) => setMask(p, clip.id, m ? { ...defaultMask(sh.value as MaskShape, aspect), x: m.x, y: m.y, feather: m.feather, invert: m.invert } : defaultMask(sh.value as MaskShape, aspect)))}>
+            <MaskIcon shape={sh.value as MaskShape} /><span>{sh.label}</span>
+          </button>
+        ))}
+      </div>
+      {m ? (
+        <>
+          <Row label="Posição horizontal" hint={pct(m.x)}><Range min={-20} max={120} step={0.5} value={m.x} apply={(v) => set({ x: v })} /></Row>
+          <Row label="Posição vertical" hint={pct(m.y)}><Range min={-20} max={120} step={0.5} value={m.y} apply={(v) => set({ y: v })} /></Row>
+          {m.shape !== 'linear' && m.shape !== 'band' && <Row label="Largura" hint={pct(m.w)}><Range min={2} max={200} step={0.5} value={m.w} apply={(v) => set({ w: v })} /></Row>}
+          {m.shape !== 'linear' && <Row label={m.shape === 'band' ? 'Espessura' : 'Altura'} hint={pct(m.h)}><Range min={2} max={200} step={0.5} value={m.h} apply={(v) => set({ h: v })} /></Row>}
+          <Row label="Rotação" hint={`${Math.round(m.rotation)}°`}><Range min={-180} max={180} step={1} value={m.rotation} apply={(v) => set({ rotation: v })} /></Row>
+          <Row label="Suavidade da borda" hint={pct(m.feather)}><Range min={0} max={100} step={1} value={m.feather} apply={(v) => set({ feather: v })} /></Row>
+          {m.shape === 'rect' && <Row label="Cantos redondos" hint={pct(m.round)}><Range min={0} max={100} step={1} value={m.round} apply={(v) => set({ round: v })} /></Row>}
+          <label className="check"><input type="checkbox" checked={m.invert} onChange={(e) => commit(set({ invert: e.target.checked }))} /> Inverter (esconde o que está dentro da forma)</label>
+          <p className="hint">A máscara acompanha o clip (posição, escala, rotação e keyframes). Por baixo vê-se o que estiver na pista de baixo.</p>
+        </>
+      ) : <p className="hint">Mostra só uma parte do clip: um círculo para uma câmara redonda, uma faixa, um coração… Escolhe uma forma.</p>}
+    </section>
+  );
+};
+
+const MaskIcon: React.FC<{ shape: MaskShape }> = ({ shape }) => {
+  const c = 'ms-on';
+  const body = {
+    rect: <rect x="5" y="6" width="14" height="12" rx="2.5" className={c} />,
+    circle: <circle cx="12" cy="12" r="7" className={c} />,
+    linear: <><rect x="3" y="12" width="18" height="7" className={c} /><path d="M3 12h18" className="ms-line" /></>,
+    band: <rect x="3" y="9" width="18" height="6" className={c} />,
+    heart: <path d="M12 19.5C7 16 4 13 4 9.6 4 7.4 5.7 5.8 7.8 5.8c1.7 0 3 .9 4.2 2.4 1.2-1.5 2.5-2.4 4.2-2.4 2.1 0 3.8 1.6 3.8 3.8 0 3.4-3 6.4-8 9.9z" className={c} />,
+    star: <path d="M12 3.5l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6-4.5-4.1 6-.7z" className={c} />,
+  }[shape];
+  return <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden><rect x="2" y="3" width="20" height="18" rx="2" className="ms-frame" />{body}</svg>;
+};
+
+/** Inverter (andar para trás) / pôr a direito */
+export const ReverseButton: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const { state, commit, notify, mediaBase } = useEditor();
+  const [busy, setBusy] = React.useState(false);
+  const back = canUnreverse(clip);
+  return (
+    <button className="btn block" disabled={busy} title={back ? 'Volta a pôr o clip a andar para a frente' : 'O clip passa a andar para trás (cria uma cópia invertida do excerto)'}
+      onClick={async () => { setBusy(true); try { await reverseClip({ project: state.project, commit, notify, mediaBase }, clip.id); } finally { setBusy(false); } }}>
+      <Icon name="reverse" size={16} /> {busy ? 'A inverter…' : back ? 'Pôr a direito' : 'Inverter (andar para trás)'}
+    </button>
   );
 };

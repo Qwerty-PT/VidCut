@@ -1367,3 +1367,41 @@ export function replaceMedia(p: Project, clipId: string, mediaId: string): Proje
     fadeIn: Math.min(c.fadeIn, duration), fadeOut: Math.min(c.fadeOut, duration),
   });
 }
+
+// ---------- máscaras ----------
+export function setMask(p: Project, clipId: string, mask: import('../shared/types').ClipMask | undefined): Project {
+  return updateClip(p, clipId, { mask });
+}
+
+// ---------- inverter ----------
+/** Põe no clip a cópia invertida (já gerada) do seu excerto; guarda o original para poder voltar */
+export function applyReversed(p: Project, clipId: string, reversedMediaId: string): Project {
+  const f = findClip(p, clipId);
+  if (!f) return p;
+  const c = f.clip;
+  const ramp = c.speedRamp ? { ...c.speedRamp, points: c.speedRamp.points.map((x) => ({ u: 1 - x.u, s: x.s })).reverse() } : undefined;
+  const volKeys = c.volKeys?.map((k) => ({ f: c.duration - k.f, v: k.v })).reverse();
+  return updateClip(p, clipId, {
+    mediaId: reversedMediaId, trimStart: 0, reversed: { mediaId: c.mediaId, trimStart: c.trimStart, duration: c.duration },
+    ...(ramp ? { speedRamp: ramp } : {}), ...(volKeys ? { volKeys } : {}),
+    fadeIn: c.fadeOut, fadeOut: c.fadeIn,
+  });
+}
+
+/** Volta a pôr o clip a direito (media e corte originais) */
+export function unreverse(p: Project, clipId: string): Project {
+  const f = findClip(p, clipId);
+  const r = f?.clip.reversed;
+  if (!f || !r || !canUnreverse(f.clip)) return p;
+  const c = f.clip;
+  const ramp = c.speedRamp ? { ...c.speedRamp, points: c.speedRamp.points.map((x) => ({ u: 1 - x.u, s: x.s })).reverse() } : undefined;
+  const volKeys = c.volKeys?.map((k) => ({ f: c.duration - k.f, v: k.v })).reverse();
+  return updateClip(p, clipId, {
+    mediaId: r.mediaId, trimStart: r.trimStart, reversed: undefined,
+    ...(ramp ? { speedRamp: ramp } : {}), ...(volKeys ? { volKeys } : {}),
+    fadeIn: c.fadeOut, fadeOut: c.fadeIn,
+  });
+}
+
+/** O clip invertido ainda está inteiro (não foi aparado/dividido)? Então dá para voltar ao original */
+export const canUnreverse = (c: Clip) => !!c.reversed && c.trimStart === 0 && c.duration === c.reversed.duration;

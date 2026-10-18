@@ -278,3 +278,51 @@ export async function replaceWithFile(ctx: Ctx & { mediaBase: string }, clipId: 
   ctx.commit(() => ({ project: replaceMedia(p1, clipId, mid), select: [clipId] }));
   ctx.notify(`Substituído por "${item.name}".`);
 }
+
+// ---------------------------------------------------------------------------
+// Inverter clip
+// ---------------------------------------------------------------------------
+import { applyReversed, canUnreverse, unreverse } from './ops';
+
+export async function reverseClip(ctx: Ctx & { mediaBase: string }, clipId: string) {
+  const p = ctx.project;
+  const f = findClip(p, clipId);
+  const m = f && p.media.find((x) => x.id === f.clip.mediaId);
+  if (!f || !m || m.kind === 'image') { ctx.notify('Só vídeos e sons se podem inverter.', 'error'); return; }
+  if (canUnreverse(f.clip)) {
+    ctx.commit((q) => {
+      let out = unreverse(q, clipId);
+      const pair = f.clip.detachedAudioId && findClip(q, f.clip.detachedAudioId)?.clip;
+      if (pair && canUnreverse(pair)) out = unreverse(out, pair.id);
+      return out;
+    });
+    ctx.notify('O clip voltou a andar para a frente.');
+    return;
+  }
+  if (busy.has('rev')) return;
+  busy.add('rev');
+  const kind = f.track.kind === 'audio' || m.kind === 'audio' ? 'audio' : 'video';
+  ctx.notify(`A inverter "${m.name}"… (o vídeo tem de ser recodificado: pode demorar um bocadinho)`);
+  try {
+    const r = await api().reverse({
+      file: m.path, start: f.clip.trimStart / p.fps, dur: clipSourceSpan(f.clip) / p.fps, fps: p.fps, kind,
+      hasAudio: kind === 'video' && m.hasAudio !== false,
+    });
+    if (!r.path) { ctx.notify(r.error || 'Não foi possível inverter.', 'error'); return; }
+    const item = { ...(await probeMedia(r.path, ctx.mediaBase)), name: `${m.name.replace(/ \(invertido\)$/, '')} (invertido)` };
+    const path = r.path;
+    ctx.commit((q) => {
+      let out = addMedia(q, [item]);
+      const nm = out.media.find((x) => x.path === path)!;
+      const fc = findClip(out, clipId);
+      if (!fc) return out;
+      out = applyReversed(out, clipId, nm.id);
+      // som separado do mesmo vídeo, alinhado: inverte também (o ficheiro invertido já traz o som ao contrário)
+      const pair = fc.clip.detachedAudioId && findClip(out, fc.clip.detachedAudioId)?.clip;
+      if (pair && pair.start === fc.clip.start && pair.duration === fc.clip.duration && pair.mediaId === m.id && pair.trimStart === fc.clip.trimStart) out = applyReversed(out, pair.id, nm.id);
+      return { project: out, select: [clipId] };
+    });
+    ctx.notify('Clip invertido. "Pôr a direito" volta ao original.');
+  } catch (e) { ctx.notify(String((e as Error).message || e), 'error'); }
+  finally { busy.delete('rev'); }
+}

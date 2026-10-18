@@ -11,6 +11,9 @@ const { createUpdater } = require('./updater.cjs');
 const { setupScreenRecording } = require('./screen-rec.cjs');
 const analysis = require('./audio-analysis.cjs');
 analysis.setFfmpeg(ffmpegPath);
+const tools = require('./media-tools.cjs');
+tools.setFfmpeg(ffmpegPath);
+const portable = require('./portable.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -106,6 +109,7 @@ function buildMenu() {
         { label: 'Abrir projeto…', accelerator: 'CmdOrCtrl+O', click: send('open') },
         { label: 'Guardar', accelerator: 'CmdOrCtrl+S', click: send('save') },
         { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', click: send('saveAs') },
+        { label: 'Empacotar projeto (para outro computador)…', click: send('pack') },
         { label: 'Definições do projeto…', accelerator: 'CmdOrCtrl+,', click: send('projectSettings') },
         { type: 'separator' },
         { label: 'Importar media…', accelerator: 'CmdOrCtrl+I', click: send('import') },
@@ -138,6 +142,9 @@ function buildMenu() {
         { role: 'toggleDevTools', label: 'Ferramentas de programador' },
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Ecrã inteiro' },
+        { type: 'separator' },
+        { label: 'Usar proxies (pré-visualização leve)', click: send('toggleProxies') },
+        { label: 'Apagar os proxies…', click: send('clearProxies') },
       ],
     },
   ];
@@ -170,9 +177,10 @@ ipcMain.handle('project:open', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Abrir projeto', properties: ['openFile'], filters: PROJECT_FILTERS });
   if (r.canceled || !r.filePaths[0]) return null;
   const file = r.filePaths[0];
-  const project = JSON.parse(await fs.readFile(file, 'utf8'));
+  const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+  const { project, missing, moved } = await portable.resolveMedia(raw, path.dirname(file));
   registerProjectMedia(project);
-  return { path: file, project };
+  return { path: file, project, missing, moved };
 });
 
 ipcMain.handle('project:save', async (_e, { project, filePath, saveAs }) => {
@@ -186,7 +194,8 @@ ipcMain.handle('project:save', async (_e, { project, filePath, saveAs }) => {
     if (r.canceled || !r.filePath) return null;
     target = r.filePath;
   }
-  await fs.writeFile(target, JSON.stringify(project, null, 2), 'utf8');
+  const withRel = await portable.addRelativePaths(project, path.dirname(target));
+  await fs.writeFile(target, JSON.stringify(withRel, null, 2), 'utf8');
   return target;
 });
 
@@ -198,6 +207,9 @@ ipcMain.handle('autosave:write', async (_e, data) => {
 ipcMain.handle('autosave:read', async () => {
   try {
     const data = JSON.parse(await fs.readFile(autosavePath(), 'utf8'));
+    const base = data.filePath ? path.dirname(data.filePath) : null;
+    const r = await portable.resolveMedia(data.project, base);
+    data.project = r.project; data.missing = r.missing;
     registerProjectMedia(data.project);
     return data;
   } catch { return null; }
@@ -411,6 +423,86 @@ ipcMain.handle('audio:denoise', async (_e, { file, strength }) => {
     }
     mediaServer.register([out]);
     return { path: out };
+  } catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+
+// ---------- Inverter clip ----------
+ipcMain.handle('media:reverse', async (_e, o) => {
+  if (!okFile(o?.file)) return { error: 'Ficheiro não encontrado.' };
+  try {
+    const out = await tools.reverseMedia({
+      file: o.file, start: Math.max(0, Number(o.start) || 0), dur: Math.max(0.05, Number(o.dur) || 0), fps: Math.min(60, Math.max(1, Number(o.fps) || 30)),
+      kind: o.kind === 'audio' ? 'audio' : 'video', hasAudio: !!o.hasAudio, outDir: path.join(app.getPath('userData'), 'invertidos'),
+      onProgress: (p) => win?.webContents.send('media:progress', { task: 'reverse', p }),
+    });
+    mediaServer.register([out]);
+    return { path: out };
+  } catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
+});
+
+// ---------- Proxies (cópias leves para a pré-visualização) ----------
+const proxyDir = () => path.join(app.getPath('userData'), 'proxies');
+const proxyQueue = [];
+let proxyBusy = false, proxyAbort = null;
+async function proxyPump() {
+  if (proxyBusy) return;
+  const job = proxyQueue.shift();
+  if (!job) return;
+  proxyBusy = true;
+  proxyAbort = new AbortController();
+  try {
+    const out = await tools.makeProxy(job.file, proxyDir(), job.dur, (p) => win?.webContents.send('proxy:progress', { file: job.file, p }), proxyAbort.signal);
+    mediaServer.register([out]);
+    win?.webContents.send('proxy:progress', { file: job.file, p: 1, proxy: out });
+  } catch (e) {
+    win?.webContents.send('proxy:progress', { file: job.file, p: 0, error: String(e.message || e).slice(0, 200) });
+  } finally { proxyBusy = false; proxyAbort = null; proxyPump(); }
+}
+ipcMain.handle('proxy:status', async (_e, files) => {
+  const out = {};
+  for (const f of Array.isArray(files) ? files : []) {
+    const p = okFile(f) ? await tools.proxyPath(f, proxyDir()) : null;
+    out[f] = p && okFile(p) ? p : null;
+    if (out[f]) mediaServer.register([out[f]]);
+  }
+  return out;
+});
+ipcMain.handle('proxy:make', (_e, items) => {
+  for (const it of Array.isArray(items) ? items : []) {
+    if (!okFile(it?.file)) { win?.webContents.send('proxy:progress', { file: it?.file, p: 0, error: 'Ficheiro em falta.' }); continue; }
+    if (!proxyQueue.some((q) => q.file === it.file)) proxyQueue.push({ file: it.file, dur: Number(it.dur) || 0 });
+  }
+  proxyPump();
+  return true;
+});
+ipcMain.handle('proxy:clear', async () => {
+  proxyQueue.length = 0; proxyAbort?.abort();
+  const dir = proxyDir();
+  let bytes = 0;
+  for (const f of await fs.readdir(dir).catch(() => [])) { const st = await fs.stat(path.join(dir, f)).catch(() => null); bytes += st?.size || 0; }
+  await fs.rm(dir, { recursive: true, force: true });
+  return { bytes };
+});
+
+// ---------- Projetos portáteis ----------
+ipcMain.handle('media:relinkFolder', async (_e, missing) => {
+  const r = await dialog.showOpenDialog(win, { title: 'Onde estão os ficheiros em falta?', properties: ['openDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const found = await portable.searchFolder(r.filePaths[0], Array.isArray(missing) ? missing : []);
+  mediaServer.register(Object.values(found));
+  return found;
+});
+ipcMain.handle('media:relinkFile', async (_e, name) => {
+  const r = await dialog.showOpenDialog(win, { title: `Onde está "${String(name || '')}"?`, properties: ['openFile'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  mediaServer.register([r.filePaths[0]]);
+  return r.filePaths[0];
+});
+ipcMain.handle('project:pack', async (_e, { project }) => {
+  const r = await dialog.showOpenDialog(win, { title: 'Empacotar projeto: escolhe onde criar a pasta', properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  try {
+    return await portable.packProject(project, r.filePaths[0], (p) => win?.webContents.send('media:progress', { task: 'pack', p }));
   } catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
 });
 

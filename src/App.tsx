@@ -28,6 +28,8 @@ import { addCaptionTrack } from './ops';
 import { Icon } from './components/Icon';
 import { openModal, useModal } from './modals';
 import { SilenceModal } from './components/SilenceModal';
+import { RelinkModal } from './components/RelinkModal';
+import { clearProxies, proxyState, setProxiesEnabled } from './proxies';
 import { ProjectTemplatesModal } from './components/ProjectTemplatesModal';
 import { placeholdersLeft } from './project-templates';
 
@@ -73,6 +75,7 @@ export const App: React.FC = () => {
       if (saved?.project?.version === 1) {
         dispatch({ type: 'load', project: saved.project, filePath: saved.filePath, saved: !saved.dirty });
         refreshThumbs(saved.project.media, info.mediaBase);
+        if (saved.missing?.length) openModal({ kind: 'relink', missing: saved.missing });
       }
     })().catch((e) => notify(String(e), 'error'));
   }, [inElectron, notify]);
@@ -144,8 +147,10 @@ export const App: React.FC = () => {
     if (!r) return;
     if (r.project?.version !== 1) return notify('Ficheiro de projeto inválido', 'error');
     playhead.seek(0);
-    dispatch({ type: 'load', project: r.project, filePath: r.path, saved: true });
+    dispatch({ type: 'load', project: r.project, filePath: r.path, saved: !r.moved });
     if (mediaBase) refreshThumbs(r.project.media, mediaBase);
+    if (r.missing?.length) openModal({ kind: 'relink', missing: r.missing });
+    else if (r.moved) notify(`O projeto mudou de sítio: ${r.moved} ${r.moved === 1 ? 'ficheiro reencontrado' : 'ficheiros reencontrados'} ao lado do projeto.`);
   };
 
   const doSave = async (saveAs = false) => {
@@ -194,6 +199,19 @@ export const App: React.FC = () => {
     } finally { off(); }
   };
 
+  const doPack = async () => {
+    const p = stateRef.current.project;
+    if (!p.media.length) return notify('O projeto ainda não tem media para empacotar.', 'error');
+    setBusy('A copiar o projeto e a media…');
+    try {
+      const r = await api().packProject(pruneFonts(pruneLotties(p)));
+      if (!r) return;
+      if (r.error) return notify(r.error, 'error');
+      notify(`Pacote criado: ${r.count} ficheiros (${(r.bytes / 1048576).toFixed(0)} MB). Copia a pasta para outro computador e abre o .vidcut que está lá dentro.${r.missing.length ? ` Faltavam ${r.missing.length}: ${r.missing.join(', ')}.` : ''}`);
+      void api().showItem(r.file);
+    } finally { setBusy(null); }
+  };
+
   const doImportSrt = async () => {
     const r = await api().captionsOpenSrt();
     if (!r) return;
@@ -219,8 +237,8 @@ export const App: React.FC = () => {
   };
 
   // ---------- atalhos ----------
-  const actions = useRef({ doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt });
-  actions.current = { doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt };
+  const actions = useRef({ doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt, doPack });
+  actions.current = { doNew, doOpen, doSave, doExport, doImport, doImportSrt, doExportSrt, doPack };
 
   useEffect(() => {
     if (!inElectron) return;
@@ -230,6 +248,9 @@ export const App: React.FC = () => {
       switch (cmd) {
         case 'new': a.doNew(); break;
         case 'newFromTemplate': openModal({ kind: 'templates' }); break;
+        case 'pack': void a.doPack(); break;
+        case 'toggleProxies': setProxiesEnabled(!proxyState().enabled, stateRef.current.project); notify(proxyState().enabled ? 'Proxies ligados: a pré-visualização usa cópias leves (o export usa os originais).' : 'Proxies desligados.'); break;
+        case 'clearProxies': if (confirm('Apagar todos os proxies? Voltam a ser criados quando precisares.')) void clearProxies().then((b) => notify(`Proxies apagados (${(b / 1048576).toFixed(0)} MB libertados).`)); break;
         case 'open': a.doOpen(); break;
         case 'save': a.doSave(false); break;
         case 'saveAs': a.doSave(true); break;
@@ -358,6 +379,7 @@ export const App: React.FC = () => {
         {projectSettingsOpen && <ProjectSettingsModal />}
         {modal?.kind === 'silence' && <SilenceModal clipId={modal.clipId} />}
         {modal?.kind === 'templates' && <ProjectTemplatesModal />}
+        {modal?.kind === 'relink' && <RelinkModal missing={modal.missing} />}
         {exportSetup && (
           <ExportOptionsModal
             project={state.project}

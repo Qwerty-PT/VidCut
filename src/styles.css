@@ -1016,3 +1016,33 @@ body.vol-dragging, body.vol-dragging * { cursor: grabbing !important; }
 .ptpl-meta { font: 11px var(--mono); color: var(--text-faint); }
 .ptpl-info p { margin: 2px 0 6px; font-size: 12.5px; color: var(--text-dim); }
 .ptpl-info .btn { align-self: flex-start; margin-top: auto; }
+
+/* ---------- invertido / máscara (etiquetas) ---------- */
+.clip-badge.rev { top: auto; bottom: 4px; right: 6px; }
+.clip-badge.msk { top: auto; bottom: 4px; right: 28px; }
+
+/* ---------- máscaras ---------- */
+.mask-shapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 4px; }
+.mask-shape { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px 5px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--text-dim); font: 10.5px var(--font); cursor: pointer; }
+.mask-shape:hover { color: var(--text); border-color: var(--text-faint); }
+.mask-shape.on { color: var(--text); border-color: var(--amber); background: rgba(242, 179, 61, 0.08); }
+.mask-shape .ms-frame { fill: none; stroke: currentColor; stroke-width: 1.2; opacity: 0.45; }
+.mask-shape .ms-on { fill: currentColor; opacity: 0.85; }
+.mask-shape.on .ms-on { fill: var(--amber); opacity: 1; }
+.mask-shape .ms-off { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-dasharray: 3 2; }
+.mask-shape .ms-line { stroke: currentColor; stroke-width: 1.4; }
+
+/* ---------- proxies ---------- */
+.proxy-toggle { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); font: 500 12px var(--mono); cursor: pointer; }
+.proxy-toggle .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.proxy-toggle.on { color: var(--text); border-color: rgba(111, 211, 159, 0.5); }
+.proxy-toggle.on .dot { background: #6fd39f; box-shadow: 0 0 6px rgba(111, 211, 159, 0.8); }
+.media-proxy { position: absolute; left: 4px; bottom: 4px; font: 600 9.5px var(--mono); padding: 1px 4px; border-radius: 3px; background: rgba(23, 25, 30, 0.85); color: #6fd39f; }
+
+/* ---------- ficheiros em falta ---------- */
+.modal.relink-modal { width: min(560px, calc(100vw - 40px)); }
+.relink-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.relink-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--bg); color: #f0a49c; font-size: 12.5px; }
+.relink-list li.ok { color: #6fd39f; }
+.rl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.rl-ok { font: 11px var(--mono); }

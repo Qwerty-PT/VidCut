@@ -8,6 +8,7 @@ import { Icon } from './Icon';
 import { LottieLibrary } from './LottieLibrary';
 import { EffectsLibrary } from './EffectsLibrary';
 import { ScreenRecorder } from './ScreenRecorder';
+import { useProxies } from '../proxies';
 import { TemplateGallery } from './TemplateGallery';
 import { StickerLibrary } from './StickerLibrary';
 import { SoundLibrary } from './SoundLibrary';
@@ -28,6 +29,7 @@ export const MediaBin: React.FC = () => {
   const [dragOver, setDragOver] = useState(false);
   const [tab, setTab] = useState<'media' | 'audio' | 'templates' | 'lottie' | 'effects' | 'stickers'>('media');
   const [recOpen, setRecOpen] = useState(false);
+  const px = useProxies();
   useEffect(() => onThumbsChange(() => force((n) => n + 1)), []);
 
   const pick = async () => {
@@ -107,6 +109,9 @@ export const MediaBin: React.FC = () => {
                   {thumb ? <img src={thumb} alt="" draggable={false} /> : <Icon name={m.kind === 'video' ? 'film' : m.kind === 'audio' ? 'music' : 'image'} size={26} />}
                   {m.durationSec > 0 && <span className="media-dur">{fmtDur(m.durationSec)}</span>}
                   {used && <span className="media-used" title="Em uso na timeline" />}
+                  {m.kind === 'video' && px.enabled && (px.ready[m.path]
+                    ? <span className="media-proxy" title="Proxy pronto: a pré-visualização usa a cópia leve">P</span>
+                    : px.progress[m.path] !== undefined ? <span className="media-proxy" title="A criar o proxy…">{Math.round((px.progress[m.path] ?? 0) * 100)}%</span> : null)}
                   <button className="media-remove" title="Remover do projeto" onClick={(e) => { e.stopPropagation(); remove(m); }}>
                     <Icon name="x" size={12} />
                   </button>

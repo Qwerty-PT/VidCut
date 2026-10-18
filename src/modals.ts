@@ -1,7 +1,7 @@
 // Janelas abertas a partir de qualquer sítio (menus, painel, timeline)
 import { useSyncExternalStore } from 'react';
 
-export type ModalState = { kind: 'silence'; clipId: string } | { kind: 'templates' } | null;
+export type ModalState = { kind: 'silence'; clipId: string } | { kind: 'templates' } | { kind: 'relink'; missing: import('./api').MissingMedia[] } | null;
 let cur: ModalState = null;
 const subs = new Set<() => void>();
 export const openModal = (m: ModalState) => { cur = m; subs.forEach((f) => f()); };

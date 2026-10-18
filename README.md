@@ -32,7 +32,8 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 **Editar**
 - Timeline com várias pistas de vídeo, áudio e texto; mover, aparar, dividir (`S`, `Q`, `W`), copiar/colar, apagar e fechar espaço
 - Íman, zoom até ao fotograma (também a arrastar na régua), forma de onda real, seleção múltipla, desfazer/refazer
-- Velocidade (0,25× a 4×) e **curvas de velocidade**, fades arrastáveis, separar o áudio, **congelar fotograma**, **dividir nas mudanças de cena**, **cortar silêncios**, **substituir media**
+- Velocidade (0,25× a 4×) e **curvas de velocidade**, fades arrastáveis, separar o áudio, **congelar fotograma**, **dividir nas mudanças de cena**, **cortar silêncios**, **substituir media**, **inverter**
+- **Máscaras** (círculo, retângulo, faixa, coração…) com borda suave
 - Enquadramento com o rato (mover, redimensionar, rodar), disposições rápidas (ecrã dividido, imagem dentro de imagem), **keyframes** com curvas IBM
 - Mudar o formato a qualquer momento (16:9, 9:16, 1:1, 4:5…) com **fundo desfocado** para encher as barras
 
@@ -66,7 +67,8 @@ O **VidCut** é um editor de vídeo e áudio ao estilo do CapCut, feito para cor
 
 **E ainda**
 - **Atualizações automáticas** — a app avisa quando há versão nova e instala com um clique
-- Pré-visualização em **ecrã inteiro** (tecla F)
+- Pré-visualização em **ecrã inteiro** (tecla F) e **proxies** para vídeos pesados (4K, HEVC)
+- **Projetos portáteis**: reencontra os ficheiros quando a pasta muda e **empacota** o projeto com a media para outro computador
 - Gravação automática contínua; projetos `.vidcut` em JSON
 
 ## Ecrãs

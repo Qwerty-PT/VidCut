@@ -18,6 +18,7 @@ import { combineEffects } from './effects';
 import { volumeAt } from './volume';
 import { StickerArt, stickerMedia } from './stickers';
 import { rampSegments } from './speedramp';
+import { maskStyle } from './mask';
 import { PlaceholderBox } from './placeholder';
 
 /** Fontes próprias do projeto: injeta o @font-face e espera que carreguem antes de desenhar */
@@ -157,7 +158,7 @@ const VisualClip: React.FC<{
     const ms = mediaStyle(tf, box);
     const filter = [colorFilter(clip.color, H), fx?.filter].filter(Boolean).join(' ') || undefined;
     return (
-      <div style={{ ...ms, transform: fx?.transform ? `${ms.transform} ${fx.transform}` : ms.transform, filter }}>
+      <div style={{ ...ms, transform: fx?.transform ? `${ms.transform} ${fx.transform}` : ms.transform, filter, ...(maskStyle(clip.mask, box.w, box.h) as React.CSSProperties) }}>
         {fx?.svg}
         {children}
         <ColorOverlays color={clip.color} />

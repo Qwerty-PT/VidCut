@@ -23,6 +23,7 @@ import { clearPreview, getPreview, usePreviewOverride } from '../preview-overrid
 import { isTyping } from '../util';
 import { STICKER_DRAG_TYPE, getDraggedSticker } from './StickerLibrary';
 import { addStickerClip } from '../ops';
+import { makeMissingProxies, refreshProxies, setProxiesEnabled, useProxies, withProxies } from '../proxies';
 
 /**
  * Ecrã inteiro da pré-visualização (botão, tecla F, duplo clique; Esc sai).
@@ -74,7 +75,12 @@ export const Preview: React.FC = () => {
   const playing = usePlaying();
   const idle = useIdle(fs.on && playing);
   const duration = projectDuration(project);
-  const inputProps = useMemo<CompositionProps>(() => ({ project, mediaBase }), [project, mediaBase]);
+  const px = useProxies();
+  const shown = useMemo(() => withProxies(project, px), [project, px]);
+  const inputProps = useMemo<CompositionProps>(() => ({ project: shown, mediaBase }), [shown, mediaBase]);
+  // proxies: ver os que já existem; com o interruptor ligado, criar os que faltam quando entram vídeos novos
+  const mediaKey = state.project.media.map((m) => m.path).join('|');
+  useEffect(() => { void (px.enabled ? makeMissingProxies(state.project) : refreshProxies(state.project)); }, [mediaKey, px.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- pré-visualização temporária ----------
   const saved = useRef<{ frame: number } | null>(null);
@@ -233,12 +239,12 @@ export const Preview: React.FC = () => {
           )}
         </div>
       </div>
-      <Transport duration={duration} fps={project.fps} fullscreen={fs.on} onFullscreen={fs.toggle} />
+      <Transport duration={duration} fps={project.fps} fullscreen={fs.on} onFullscreen={fs.toggle} proxies={<ProxyToggle />} />
     </section>
   );
 };
 
-const Transport: React.FC<{ duration: number; fps: number; fullscreen: boolean; onFullscreen: () => void }> = ({ duration, fps, fullscreen, onFullscreen }) => {
+const Transport: React.FC<{ duration: number; fps: number; fullscreen: boolean; onFullscreen: () => void; proxies: React.ReactNode }> = ({ duration, fps, fullscreen, onFullscreen, proxies }) => {
   const frame = useFrame();
   const playing = usePlaying();
   return (
@@ -254,6 +260,7 @@ const Transport: React.FC<{ duration: number; fps: number; fullscreen: boolean; 
         <button className="icon-btn" title="Fim (End)" onClick={() => playhead.seek(duration - 1)}><Icon name="end" /></button>
       </div>
       <div className="transport-right">
+        {!fullscreen && proxies}
         {!fullscreen && <SafeZoneMenu />}
         {!fullscreen && <AspectMenu />}
         <span className="tc dim">{timecode(duration, fps)}</span>
@@ -304,5 +311,27 @@ const TextDragOverlay: React.FC = () => {
     <div className="text-drag" onPointerDown={onDown} title="Arrasta para mover o texto">
       <div className="text-drag-mark" style={{ left: `${kv.x}%`, top: `${kv.y}%` }} />
     </div>
+  );
+};
+
+/** Interruptor dos proxies, com o progresso dos que estão a ser criados */
+const ProxyToggle: React.FC = () => {
+  const { state } = useEditor();
+  const px = useProxies();
+  const vids = state.project.media.filter((m) => m.kind === 'video');
+  if (!vids.length && !px.enabled) return null;
+  const working = vids.filter((m) => px.progress[m.path] !== undefined);
+  const ready = vids.filter((m) => px.ready[m.path]).length;
+  const pct = working.length ? Math.round((working.reduce((a, m) => a + (px.progress[m.path] ?? 0), 0) / working.length) * 100) : null;
+  return (
+    <button
+      className={`proxy-toggle${px.enabled ? ' on' : ''}`}
+      onClick={() => setProxiesEnabled(!px.enabled, state.project)}
+      title={px.enabled
+        ? `Proxies ligados: a pré-visualização usa cópias leves (540p) — ${ready} de ${vids.length} prontos. O export usa sempre os originais. Clica para desligar.`
+        : 'Usar proxies: cópias leves dos vídeos para a pré-visualização ficar fluida (4K, HEVC, computadores lentos). O export usa sempre os originais.'}
+    >
+      <span className="dot" /> Proxy{px.enabled ? (pct !== null ? ` ${pct}%` : ` ${ready}/${vids.length}`) : ''}
+    </button>
   );
 };

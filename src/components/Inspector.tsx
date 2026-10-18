@@ -8,7 +8,7 @@ import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
-import { AudioToolsSection, PlaceholderSection, MultiAudioActions, RhythmSection, ScenesButton, StickerSection, VolumeSection, CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
+import { MaskSection, ReverseButton, AudioToolsSection, PlaceholderSection, MultiAudioActions, RhythmSection, ScenesButton, StickerSection, VolumeSection, CaptionSection, AnimSection, ColorSection, EffectsSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
 import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import { stickerMedia } from '../../shared/stickers';
@@ -258,10 +258,11 @@ export const Inspector: React.FC = () => {
             {((media && media.kind !== 'image') || clip.lottie) && <SpeedSection clip={clip} fps={fps} />}
             {media && hasSound(project, clip.id) && <AudioToolsSection clip={clip} media={media} />}
             {media?.kind === 'video' && isVisual && !clip.template && !clip.lottie && <ScenesButton clip={clip} />}
+            {media && (media.kind === 'video' || media.kind === 'audio') && !clip.template && !clip.lottie && !clip.sticker && !clip.placeholder && <ReverseButton clip={clip} />}
             {media && (media.kind === 'audio' || (media.kind === 'video' && !isVisual)) && <RhythmSection clip={clip} media={media} />}
           </>
         )}
-        {curTab === 'frame' && media && <TransformSection clip={clip} media={media} />}
+        {curTab === 'frame' && media && <><TransformSection clip={clip} media={media} /><MaskSection clip={clip} media={media} /></>}
         {curTab === 'color' && <><EffectsSection clip={clip} /><ColorSection clip={clip} /></>}
         {curTab === 'anim' && <AnimSection clip={clip} isText={false} fps={fps} />}
       </div>
