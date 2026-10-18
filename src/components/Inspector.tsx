@@ -4,11 +4,11 @@ import { TRANSITION_PREFIX, setTransition, canDetachAudio, changeFps, clipsAt, c
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
-import { Range, Row } from './Fields';
+import { Range, Row, Segmented } from './Fields';
 import { AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
-import type { MediaItem, Project, TransitionType } from '../../shared/types';
-import { TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
+import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
+import { DIRECTIONAL, DIR_LABELS, TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
 
 const RESOLUTIONS: { label: string; w: number; h: number }[] = [
@@ -275,6 +275,16 @@ const TransitionPanel: React.FC<{ clipId: string }> = ({ clipId }) => {
             </button>
           ))}
         </div>
+
+        {DIRECTIONAL[tr.type] && (
+          <Row label="Direção">
+            <Segmented
+              label="Direção" value={tr.direction ?? DIRECTIONAL[tr.type]!}
+              onChange={(d: TransitionDir) => set({ direction: d })}
+              options={DIR_LABELS.map((d) => ({ value: d.dir, label: d.label, title: d.title }))}
+            />
+          </Row>
+        )}
 
         <Row label="Duração" hint={`${sec} s`}>
           <Range min={2} max={max} step={1} value={dur} apply={(v) => (p) => setTransition(p, clipId, { ...tr, duration: v })} />

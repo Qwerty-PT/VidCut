@@ -15,22 +15,27 @@ import { TemplateDurationContext } from './template-api';
 const clampFrame = (f: number, duration: number) => Math.min(duration - 1, Math.max(0, f));
 
 /** Opacidade, transformações e volume de um clip de vídeo num frame global */
-function clipLook(clip: Clip, act: ActiveTransitions, g: number) {
+function clipLook(clip: Clip, act: ActiveTransitions, g: number, H = 1080) {
   let opacity = fadeFactor(clampFrame(g - clip.start, clip.duration), clip.duration, clip.fadeIn, clip.fadeOut);
   let volume = opacity;
   const transforms: string[] = [];
+  const filters: string[] = [];
   let clipPath: string | undefined;
-  const apply = (role: 'in' | 'out', type: NonNullable<ActiveTransitions['inT']>['type'], t: number) => {
-    const r = transitionStyle(type, role, t);
+  let flash = 0, rgb = 0;
+  const apply = (role: 'in' | 'out', tr: NonNullable<ActiveTransitions['inT']>, t: number) => {
+    const r = transitionStyle(tr.type, role, t, { frame: g, H, dir: tr.dir, seed: tr.seed });
     opacity *= r.opacity;
     volume *= transitionVolume(role, t);
     if (r.style.transform) transforms.push(String(r.style.transform));
     if (r.style.clipPath) clipPath = String(r.style.clipPath);
+    if (r.style.filter) filters.push(String(r.style.filter));
+    if (r.flash) flash = Math.max(flash, r.flash);
+    if (r.rgb) rgb = Math.max(rgb, r.rgb);
   };
   if (act.inT) {
     const w0 = clip.start - act.inT.pre;
     const len = act.inT.pre + act.inT.post;
-    if (g < w0 + len) apply('in', act.inT.type, (g - w0) / len);
+    if (g < w0 + len) apply('in', act.inT, (g - w0) / len);
   }
   // animação de entrada/saída (mesmos presets do texto, aplicados ao clip inteiro)
   const st = animState(clip.animIn, clip.animOut, g - clip.start, clip.duration);
@@ -44,10 +49,37 @@ function clipLook(clip: Clip, act: ActiveTransitions, g: number) {
     const end = clip.start + clip.duration;
     const w0 = end - act.outT.pre;
     const len = act.outT.pre + act.outT.post;
-    if (g >= w0) apply('out', act.outT.type, (g - w0) / len);
+    if (g >= w0) apply('out', act.outT, (g - w0) / len);
   }
-  return { opacity, volume, style: { transform: transforms.join(' ') || undefined, clipPath } as React.CSSProperties };
+  return {
+    opacity, volume, flash, rgb,
+    style: { transform: transforms.join(' ') || undefined, clipPath, filter: filters.join(' ') || undefined } as React.CSSProperties,
+  };
 }
+
+/** Camada de um clip visual: opacidade/transformações da transição, separação RGB (glitch) e clarão (flash) */
+const Layer: React.FC<{ look: ReturnType<typeof clipLook>; id: string; children: React.ReactNode }> = ({ look, id, children }) => {
+  const fid = `vc-rgb-${id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const rgb = look.rgb > 0.2 ? look.rgb : 0;
+  const filter = [rgb ? `url(#${fid})` : '', look.style.filter ?? ''].join(' ').trim() || undefined;
+  return (
+    <AbsoluteFill style={{ opacity: look.opacity, ...look.style, filter }}>
+      {rgb > 0 && (
+        <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
+          <filter id={fid} x="-5%" y="0%" width="110%" height="100%" colorInterpolationFilters="sRGB">
+            <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
+            <feOffset in="r" dx={rgb} dy={0} result="ro" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="gb" />
+            <feOffset in="gb" dx={-rgb} dy={0} result="gbo" />
+            <feBlend in="ro" in2="gbo" mode="screen" />
+          </filter>
+        </svg>
+      )}
+      {children}
+      {look.flash > 0 && <AbsoluteFill style={{ background: '#ffffff', opacity: look.flash }} />}
+    </AbsoluteFill>
+  );
+};
 
 /** Filtro CSS para os ajustes de cor (brilho, contraste, saturação, sépia, desfocar) */
 function colorFilter(c: ClipColor | undefined, H: number): string | undefined {
@@ -89,7 +121,7 @@ const VisualClip: React.FC<{
 }> = ({ clip, media, track, base, fps, act, from, pre, post, resolveMedia }) => {
   const local = useCurrentFrame();
   const { width: W, height: H } = useVideoConfig();
-  const look = clipLook(clip, act, from + local);
+  const look = clipLook(clip, act, from + local, H);
   const src = media ? mediaUrl(base, media.path) : '';
   const tf = animatedTransform(clip, clampFrame(from + local - clip.start, clip.duration));
   look.opacity *= tf.opacity;
@@ -112,7 +144,7 @@ const VisualClip: React.FC<{
     for (const f of def.fields) if (props[f.key] === undefined) props[f.key] = f.default;
     const Comp = def.component;
     return (
-      <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+      <Layer look={look} id={clip.id}>
         {frameBox(
           <Sequence from={pre} durationInFrames={clip.duration + post} layout="none">
             <TemplateDurationContext.Provider value={clip.duration}>
@@ -120,16 +152,16 @@ const VisualClip: React.FC<{
             </TemplateDurationContext.Provider>
           </Sequence>,
         )}
-      </AbsoluteFill>
+      </Layer>
     );
   }
 
   if (!media) return null;
   if (media.kind === 'image') {
     return (
-      <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+      <Layer look={look} id={clip.id}>
         {frameBox(<Img src={src} style={fill} />)}
-      </AbsoluteFill>
+      </Layer>
     );
   }
 
@@ -144,7 +176,7 @@ const VisualClip: React.FC<{
   const lastSrc = Math.max(0, Math.floor(clip.trimStart + clip.duration * sp) - 1);
 
   return (
-    <AbsoluteFill style={{ opacity: look.opacity, ...look.style }}>
+    <Layer look={look} id={clip.id}>
       {frameBox(<>
       {pre > 0 && !preReal && (
         <Sequence from={0} durationInFrames={pre} layout="none">
@@ -159,7 +191,7 @@ const VisualClip: React.FC<{
           trimBefore={mainTrim > 0 ? mainTrim : undefined}
           muted={vol === 0}
           playbackRate={sp}
-          volume={(f) => vol * clipLook(clip, act, from + mainFrom + f).volume}
+          volume={(f) => vol * clipLook(clip, act, from + mainFrom + f, H).volume}
           style={fill}
         />
       </Sequence>
@@ -171,7 +203,7 @@ const VisualClip: React.FC<{
         </Sequence>
       )}
       </>)}
-    </AbsoluteFill>
+    </Layer>
   );
 };
 

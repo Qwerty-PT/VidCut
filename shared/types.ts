@@ -133,12 +133,18 @@ export interface TextContent {
   shadow: boolean;
 }
 
-export type TransitionType = 'dissolve' | 'dip' | 'slide' | 'push' | 'wipe' | 'zoom';
+export type TransitionType = 'dissolve' | 'dip' | 'slide' | 'push' | 'wipe' | 'zoom'
+  | 'blur' | 'flash' | 'glitch' | 'circle' | 'diamond' | 'blinds' | 'whip';
+
+/** Sentido do movimento do clip que entra */
+export type TransitionDir = 'left' | 'right' | 'up' | 'down';
 
 export interface Transition {
   type: TransitionType;
   /** Duração total em frames, centrada no corte */
   duration: number;
+  /** Só para transições com direção (deslizar, empurrar, cortina, chicote, persianas) */
+  direction?: TransitionDir;
 }
 
 export interface Track {
