@@ -162,16 +162,46 @@ export const Timeline: React.FC = () => {
   }), [z]);
 
   // ---------- régua / scrub ----------
+  /**
+   * Régua do tempo: clicar → a agulha salta; arrastar na horizontal → scrub;
+   * arrastar na vertical → zoom (para cima aproxima, para baixo afasta), ancorado no ponto clicado.
+   * A direção decide-se nos primeiros píxeis e mantém-se até largar.
+   */
   const onRulerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
     playhead.pause();
-    document.body.classList.add('scrubbing');
+    const x0 = e.clientX, y0 = e.clientY;
+    const startPps = pps;
+    const anchorFrame = frameAtClientX(x0);
+    let mode: 'undecided' | 'scrub' | 'zoom' = 'undecided';
     const seekTo = (x: number) => playhead.seek(clamp(Math.round(frameAtClientX(x)), 0, duration - 1));
-    seekTo(e.clientX);
-    const move = (ev: PointerEvent) => seekTo(ev.clientX);
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('scrubbing'); };
+    const zoomAt = (dy: number) => {
+      const el = scrollRef.current;
+      const next = clamp(startPps * Math.pow(2, -dy / 70), MIN_PPS, MAX_PPS); // 70 px = 2×
+      if (el) {
+        const r = el.getBoundingClientRect();
+        pendingScroll.current = Math.max(0, anchorFrame * (next / fps) - (x0 - r.left - HEADER_W));
+      }
+      setPps(next);
+    };
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0, dy = ev.clientY - y0;
+      if (mode === 'undecided') {
+        if (Math.hypot(dx, dy) < 5) return;
+        mode = Math.abs(dy) > Math.abs(dx) ? 'zoom' : 'scrub';
+        document.body.classList.add(mode === 'zoom' ? 'tl-zooming' : 'scrubbing');
+      }
+      if (mode === 'scrub') seekTo(ev.clientX);
+      else zoomAt(dy);
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.classList.remove('scrubbing', 'tl-zooming');
+      if (mode === 'undecided') seekTo(ev.clientX); // foi um clique
+    };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
@@ -494,7 +524,7 @@ export const Timeline: React.FC = () => {
         <div className="tl-content" style={{ width: contentW }}>
           <div className="tl-ruler-row" style={{ height: RULER_H }}>
             <div className="tl-corner" style={{ width: HEADER_W }} />
-            <div className="tl-ruler" onPointerDown={onRulerDown}>
+            <div className="tl-ruler" onPointerDown={onRulerDown} onDoubleClick={zoomFit} title="Clica para mover a agulha · arrasta ↔ para percorrer · arrasta ↕ para aproximar/afastar · duplo clique ajusta ao projeto">
               {ticks}
               <PlayheadHandle z={z} onDown={onRulerDown} />
             </div>

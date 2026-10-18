@@ -52,6 +52,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Formato do projeto sem começar de novo:** botão de proporção por baixo do ecrã (16:9, 9:16, 1:1, 4:5, 4:3, 21:9, Personalizado — mantém o lado menor, ex.: 1080) e janela **Definições do projeto** (nome, formato em cartões, qualidade 720p–4K, fps, cor de fundo), aberta pelo nome do projeto no topo, por Ficheiro → Definições do projeto (Cmd+,) ou pelo botão "Modificar…" no painel Projeto. Tudo num só passo, desfazível
 
+- **Zoom pela régua do tempo:** clicar move a agulha, arrastar ↔ faz scrub, arrastar ↕ aproxima (para cima) ou afasta (para baixo) centrado no ponto clicado, duplo clique ajusta ao projeto. Cursor de relógio com setas na régua e lupa durante o zoom
+
 ## Requisitos
 
 - Node.js 20 ou superior
