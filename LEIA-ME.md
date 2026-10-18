@@ -207,7 +207,10 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
 - Lottie: animações prontas (.json)
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
-- Sugestões em aberto: ecrã verde, aceleração por hardware no export (Mac), marcadores na timeline, pré-visualização em ecrã inteiro
+- **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export
+- **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada
+- **Marcadores na timeline:** tecla M adiciona um marcador com nome e cor na régua; saltar entre marcadores; o íman encosta clips aos marcadores
+- **Pré-visualização em ecrã inteiro:** botão e tecla F para ver o vídeo a tocar em ecrã inteiro, sem a interface (Esc para sair)
 
 ### Backlog — mais tarde (não fazer em conjunto com o anterior)
 
