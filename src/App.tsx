@@ -12,6 +12,7 @@ import { Preview } from './components/Preview';
 import { Inspector, cutAtPlayhead, splitAtPlayhead } from './components/Inspector';
 import { Timeline } from './components/Timeline';
 import { ExportModal, type ExportState } from './components/ExportModal';
+import { UpdateBanner } from './components/UpdateBanner';
 import { ExportOptionsModal, loadExportOptions } from './components/ExportOptions';
 import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '../shared/export';
 import { changeFps } from './ops';
@@ -355,6 +356,7 @@ export const App: React.FC = () => {
           />
         )}
         {exporting && <ExportModal state={exporting} onClose={() => setExporting(null)} />}
+        <UpdateBanner beforeInstall={async () => { await api().autosaveWrite({ project: state.project, filePath: state.filePath, dirty }).catch(() => {}); }} />
       </div>
     </EditorProvider>
   );

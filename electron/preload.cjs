@@ -35,6 +35,17 @@ contextBridge.exposeInMainWorld('vidcut', {
     ipcRenderer.on('export:progress', h);
     return () => ipcRenderer.removeListener('export:progress', h);
   },
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateCancel: () => ipcRenderer.invoke('update:cancel'),
+  updateSkip: (v) => ipcRenderer.invoke('update:skip', v),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateOpenPage: () => ipcRenderer.invoke('update:openPage'),
+  onUpdate: (cb) => {
+    const h = (_e, u) => cb(u);
+    ipcRenderer.on('update:status', h);
+    return () => ipcRenderer.removeListener('update:status', h);
+  },
   onMenu: (cb) => {
     const h = (_e, cmd) => cb(cmd);
     ipcRenderer.on('menu', h);

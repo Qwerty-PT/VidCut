@@ -14,6 +14,22 @@ export interface LottieLibItem { id: string; name: string; data: Record<string, 
 
 export interface AutosaveData { project: Project; filePath: string | null; dirty: boolean }
 
+export interface UpdateStatus {
+  status: 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
+  current: string;
+  kind: string;
+  manual?: boolean;
+  version?: string;
+  notes?: string;
+  url?: string;
+  canInstall?: boolean;
+  size?: number;
+  progress?: number;
+  got?: number;
+  total?: number;
+  message?: string;
+}
+
 export interface VidCutApi {
   info(): Promise<{ mediaBase: string; platform: string; version: string }>;
   pickMedia(): Promise<string[]>;
@@ -40,6 +56,13 @@ export interface VidCutApi {
   lottieRename(id: string, name: string): Promise<boolean>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
   onMenu(cb: (cmd: string) => void): () => void;
+  updateCheck(): Promise<void>;
+  updateDownload(): Promise<void>;
+  updateCancel(): Promise<void>;
+  updateSkip(version: string): Promise<void>;
+  updateInstall(): Promise<boolean | { error: string }>;
+  updateOpenPage(): Promise<void>;
+  onUpdate(cb: (u: UpdateStatus) => void): () => void;
 }
 
 declare global {

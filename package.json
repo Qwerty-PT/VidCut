@@ -1,7 +1,7 @@
 {
   "name": "vidcut",
   "productName": "VidCut",
-  "version": "0.18.0",
+  "version": "0.19.1",
   "description": "Editor de vídeo simples com animações (Remotion + Electron)",
   "author": "Nuno Silva",
   "private": true,
@@ -86,6 +86,9 @@
       "target": [
         {
           "target": "dmg"
+        },
+        {
+          "target": "zip"
         }
       ],
       "category": "public.app-category.video",
@@ -185,5 +188,9 @@
       ]
     }
   },
-  "homepage": "https://github.com/Qwerty-PT"
+  "homepage": "https://github.com/Qwerty-PT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Qwerty-PT/VidCut.git"
+  }
 }

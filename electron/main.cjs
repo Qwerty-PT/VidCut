@@ -7,6 +7,7 @@ const { renderProject } = require('./render.cjs');
 const { getPeaks } = require('./peaks.cjs');
 const { createLottieLibrary } = require('./lottie-lib.cjs');
 const { transcribeMedia, captionsStatus } = require('./captions.cjs');
+const { createUpdater } = require('./updater.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -41,6 +42,7 @@ const mediaServer = createMediaServer();
 let mediaBase = '';
 let win = null;
 let currentExport = null;
+const updater = createUpdater({ send: (u) => win?.webContents.send('update:status', u) });
 
 const autosavePath = () => path.join(app.getPath('userData'), 'autosave.vidcut');
 
@@ -77,7 +79,21 @@ function buildMenu() {
   const send = (cmd) => () => win?.webContents.send('menu', cmd);
   const isMac = process.platform === 'darwin';
   const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about', label: 'Acerca do VidCut' },
+        { label: 'Procurar atualizações…', click: () => updater.check({ manual: true }) },
+        { type: 'separator' },
+        { role: 'services', label: 'Serviços' },
+        { type: 'separator' },
+        { role: 'hide', label: 'Ocultar VidCut' },
+        { role: 'hideOthers', label: 'Ocultar outros' },
+        { role: 'unhide', label: 'Mostrar tudo' },
+        { type: 'separator' },
+        { role: 'quit', label: 'Sair do VidCut' },
+      ],
+    }] : []),
     {
       label: 'Ficheiro',
       submenu: [
@@ -120,6 +136,16 @@ function buildMenu() {
       ],
     },
   ];
+  template.push({
+    label: 'Ajuda',
+    submenu: [
+      { label: 'Procurar atualizações…', click: () => updater.check({ manual: true }) },
+      { label: 'Novidades e versões', click: () => shell.openExternal('https://github.com/Qwerty-PT/VidCut/releases') },
+      { label: 'VidCut no GitHub', click: () => shell.openExternal('https://github.com/Qwerty-PT/VidCut') },
+      { type: 'separator' },
+      { label: `Versão ${app.getVersion()}`, enabled: false },
+    ],
+  });
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
@@ -272,12 +298,24 @@ ipcMain.handle('edit:native', (_e, action) => {
 
 ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
 
+// ---------- Atualizações ----------
+ipcMain.handle('update:check', () => updater.check({ manual: true }));
+ipcMain.handle('update:download', () => updater.downloadUpdate());
+ipcMain.handle('update:cancel', () => updater.cancel());
+ipcMain.handle('update:skip', (_e, v) => updater.skip(String(v)));
+ipcMain.handle('update:openPage', () => updater.openPage());
+ipcMain.handle('update:install', async () => {
+  try { return await updater.install(); } catch (e) { return { error: e.message || String(e) }; }
+});
+
 // ---------- Arranque ----------
 app.setName('VidCut');
 app.whenReady().then(async () => {
   mediaBase = await mediaServer.listen();
   buildMenu();
   createWindow();
+  // procura atualizações uns segundos depois de abrir (no máximo uma vez por dia)
+  win.webContents.once('did-finish-load', () => setTimeout(() => updater.autoCheck(), 8000));
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

@@ -1,0 +1,68 @@
+# Publica uma versão: ao enviar uma etiqueta vX.Y.Z, compila os instaladores
+# em Mac, Windows e Linux e cria a Release no GitHub (é aí que a app procura atualizações).
+name: Publicar versão
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14          # Apple Silicon (arm64)
+            target: --mac --arm64
+          - os: windows-latest
+            target: --win --x64
+          - os: ubuntu-latest
+            target: --linux --x64
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # sem certificado: assinatura ad-hoc no Mac
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder ${{ matrix.target }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vidcut-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Notas da versão (secção do NOVIDADES.md)
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          awk -v v="$V" '$0 ~ "^## "v"( |$)" {on=1; next} /^## / && on {exit} on' NOVIDADES.md > notas.md || true
+          [ -s notas.md ] || echo "Versão $V" > notas.md
+          cat notas.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: VidCut ${{ github.ref_name }}
+          body_path: notas.md
+          files: artifacts/*

@@ -54,6 +54,12 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Zoom pela régua do tempo:** clicar move a agulha, arrastar ↔ faz scrub, arrastar ↕ aproxima (para cima) ou afasta (para baixo) centrado no ponto clicado, duplo clique ajusta ao projeto. Cursor de relógio com setas na régua e lupa durante o zoom
 
+- **Atualizações automáticas:** na app instalada, procura versões novas nas Releases do GitHub uns segundos depois de abrir (no máximo uma vez por dia) e em **Ajuda → Procurar atualizações** (no Mac também em VidCut → Procurar atualizações). Aviso no canto com as novidades: **Atualizar** descarrega (com progresso e verificação de tamanho/SHA-256), **Reiniciar e instalar** fecha, substitui e volta a abrir; o projeto aberto fica na gravação automática. "Saltar esta versão" deixa de avisar dessa versão
+  - macOS: descarrega o `.zip` e substitui a VidCut.app (funciona sem certificado Apple; a app tem de estar numa pasta onde possas escrever, ex.: Aplicações)
+  - Windows: corre o instalador em modo silencioso e reabre (a versão portátil abre a página para descarregar)
+  - Linux: o AppImage substitui-se a si próprio; o .deb abre a página para descarregar
+  - Em `npm run dev` só avisa (atualiza-se com `git pull`)
+
 ## Requisitos
 
 - Node.js 20 ou superior
@@ -116,6 +122,13 @@ npm run dist:linux
 Notas:
 - Na app instalada, o Chrome do Remotion fica em `~/Library/Application Support/VidCut/node_modules/.remotion` (descarregado no primeiro export); o autosave e as formas de onda ficam na mesma pasta
 - Empacotamento testado em Linux (pasta desempacotada): importar, exportar GIF e MP3 a partir da app instalada
+
+## Publicar uma versão
+
+1. Sobe a versão no `package.json` (ex.: `0.19.0` → `0.20.0`) e escreve a secção `## 0.20.0` em `NOVIDADES.md`
+2. `git commit -am "0.20.0" && git tag v0.20.0 && git push && git push --tags`
+3. O GitHub Actions (`.github/workflows/release.yml`) compila em Mac (Apple Silicon), Windows e Linux e cria a Release com `.dmg`, `.zip`, `-Setup.exe`, `-Portatil.exe`, `.AppImage` e `.deb` (10–20 min; acompanha no separador **Actions** do repositório)
+4. As apps instaladas veem a versão nova no próximo arranque
 
 ## Atalhos
 
