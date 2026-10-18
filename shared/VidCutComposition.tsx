@@ -1,8 +1,10 @@
 import React from 'react';
 import { AbsoluteFill, Audio, Freeze, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { Clip, ClipColor, CompositionProps, MediaItem, Track } from './types';
+import type { Clip, ClipColor, CompositionProps, LottieAsset, MediaItem, Track } from './types';
 import { clipSpeed, mediaUrl, sourceFrames } from './types';
 import { fadeFactor } from './motion';
+import { Lottie, type LottieAnimationData } from '@remotion/lottie';
+import { lottieMedia } from './lottie';
 import { activeTransitions, transitionStyle, transitionVolume, type ActiveTransitions } from './transitions';
 import { animState, blockStyle } from './anim';
 import { TextLayer } from './TextLayer';
@@ -117,8 +119,8 @@ const ColorOverlays: React.FC<{ color?: ClipColor }> = ({ color }) => {
 
 const VisualClip: React.FC<{
   clip: Clip; media?: MediaItem; track: Track; base: string; fps: number; act: ActiveTransitions; from: number; pre: number; post: number;
-  resolveMedia: (id: string) => string;
-}> = ({ clip, media, track, base, fps, act, from, pre, post, resolveMedia }) => {
+  resolveMedia: (id: string) => string; lottie?: LottieAsset;
+}> = ({ clip, media, track, base, fps, act, from, pre, post, resolveMedia, lottie }) => {
   const local = useCurrentFrame();
   const { width: W, height: H } = useVideoConfig();
   const look = clipLook(clip, act, from + local, H);
@@ -130,7 +132,7 @@ const VisualClip: React.FC<{
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' };
   // caixa posicionada/transformada com filtros de cor; a media enche a caixa
   const frameBox = (children: React.ReactNode) => (
-    <div style={{ ...mediaStyle(tf, clip.template ? { w: W, h: H } : baseSize(media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
+    <div style={{ ...mediaStyle(tf, clip.template ? { w: W, h: H } : baseSize(clip.lottie ? lottieMedia(lottie) : media, W, H, tf.fit)), filter: colorFilter(clip.color, H) }}>
       {children}
       <ColorOverlays color={clip.color} />
     </div>
@@ -150,6 +152,19 @@ const VisualClip: React.FC<{
             <TemplateDurationContext.Provider value={clip.duration}>
               <Comp p={props} />
             </TemplateDurationContext.Provider>
+          </Sequence>,
+        )}
+      </Layer>
+    );
+  }
+
+  if (clip.lottie) {
+    if (!lottie) return null;
+    return (
+      <Layer look={look} id={clip.id}>
+        {frameBox(
+          <Sequence from={pre} durationInFrames={clip.duration + post} layout="none">
+            <Lottie animationData={lottie.data as unknown as LottieAnimationData} loop={clip.lottie.loop} playbackRate={sp} style={fill} />
           </Sequence>,
         )}
       </Layer>
@@ -231,7 +246,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
         [...track.clips].sort((a, b) => a.start - b.start).map((clip) => {
           const media = mediaById.get(clip.mediaId);
           if (clip.duration <= 0) return null;
-          if (!media && !((clip.text || clip.template) && track.kind !== 'audio')) return null;
+          if (!media && !((clip.text || clip.template || clip.lottie) && track.kind !== 'audio')) return null;
           if (track.kind === 'audio' && media) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name={media.name}>
@@ -240,7 +255,7 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
             );
           }
           if (track.hidden) return null;
-          if (clip.text || (!media && !clip.template)) {
+          if (clip.text || (!media && !clip.template && !clip.lottie)) {
             return (
               <Sequence key={clip.id} from={clip.start} durationInFrames={clip.duration} name="Texto">
                 {clip.text && <TextLayer clip={clip} text={clip.text} />}
@@ -252,8 +267,8 @@ export const VidCutComposition: React.FC<CompositionProps> = ({ project, mediaBa
           const post = act.outT?.post ?? 0;
           const from = clip.start - pre;
           return (
-            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media?.name ?? clip.template?.id}>
-              <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} resolveMedia={resolveMedia} />
+            <Sequence key={clip.id} from={from} durationInFrames={clip.duration + pre + post} name={media?.name ?? clip.template?.id ?? 'Lottie'}>
+              <VisualClip clip={clip} media={media} track={track} base={mediaBase} fps={project.fps} act={act} from={from} pre={pre} post={post} resolveMedia={resolveMedia} lottie={clip.lottie ? project.lotties?.[clip.lottie.assetId] : undefined} />
             </Sequence>
           );
         }),

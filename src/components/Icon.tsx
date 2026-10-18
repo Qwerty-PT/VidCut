@@ -23,6 +23,8 @@ const P: Record<string, React.ReactNode> = {
   volume: <><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor" /><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" /></>,
   mute: <><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></>,
   plus: <><path d="M12 5v14M5 12h14" /></>,
+  close: <><path d="M6 6l12 12M18 6L6 18" /></>,
+  sparkle: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /></>,
   minus: <path d="M5 12h14" />,
   zoomFit: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></>,
   magnet: <><path d="M6 4v8a6 6 0 0012 0V4" /><path d="M6 8h4M14 8h4" /><path d="M10 4v8a2 2 0 004 0V4" /></>,

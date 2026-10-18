@@ -1,6 +1,7 @@
 // Operações de edição — funções puras (Project → Project).
 // Regra base: clips na mesma pista nunca se sobrepõem.
-import type { Clip, ClipColor, ClipTransform, KfEasing, KfProp, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import type { Clip, ClipColor, ClipTransform, KfEasing, KfProp, LottieAsset, MediaItem, Project, TextContent, Track, TrackKind } from '../shared/types';
+import { lottieInfo } from '../shared/lottie';
 import { clipSpeed } from '../shared/types';
 import { getTransform, isDefaultTransform } from '../shared/transform';
 import { scaleKeyframes, shiftKeyframes, sortKeyframes, valuesAt } from '../shared/keyframes';
@@ -599,6 +600,36 @@ export function addTemplateClip(
   const trackId = track.id;
   project = mapTrack(project, trackId, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
   return { project, clipId: clip.id };
+}
+
+/** Adiciona uma animação Lottie (embute os dados no projeto) */
+export function addLottieClip(
+  p: Project, asset: LottieAsset, start: number, opts: { trackId?: string; magnet?: boolean; newTrack?: boolean } = {},
+): { project: Project; clipId: string | null } {
+  const info = lottieInfo(asset.data);
+  const duration = Math.max(Math.round(p.fps), Math.round(info.durationSec * p.fps));
+  let project: Project = { ...p, lotties: { ...p.lotties, [asset.id]: p.lotties?.[asset.id] ?? asset } };
+  let track = opts.trackId ? project.tracks.find((t) => t.id === opts.trackId && t.kind === 'video') : undefined;
+  if (!track && !opts.newTrack) track = project.tracks.find((t) => t.kind === 'video' && overlaps(t, start, duration).length === 0);
+  if (!track) {
+    const r = addTrack(project, 'video', true);
+    project = r.project;
+    track = project.tracks.find((t) => t.id === r.trackId)!;
+  }
+  const desired = opts.magnet ? magnetStart(track, start) : start;
+  const clip: Clip = {
+    id: uid('c'), mediaId: '', start: freeStart(track, desired, duration), duration,
+    trimStart: 0, volume: 1, fadeIn: 0, fadeOut: 0,
+    lottie: { assetId: asset.id, loop: false },
+  };
+  project = mapTrack(project, track.id, (t) => ({ ...t, clips: sortClips([...t.clips, clip]) }));
+  return { project, clipId: clip.id };
+}
+
+export function setLottieLoop(p: Project, clipId: string, loop: boolean): Project {
+  const f = findClip(p, clipId);
+  if (!f?.clip.lottie) return p;
+  return updateClip(p, clipId, { lottie: { ...f.clip.lottie, loop } });
 }
 
 export function updateTemplateProps(p: Project, clipId: string, patch: Record<string, unknown>): Project {

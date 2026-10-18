@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../editor-context';
-import { rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { addLottieClip, rippleDelete, moveClips, moveKeyframe, addClip, addTemplateClip, addTextClip, addTrack, canDetachAudio, deleteClips, detachAudio, findClip, moveClip, reattachAudio, removeTrack, setTransition, transitionSelId, trimClip, updateClip, updateTrack } from '../ops';
+import { getLottieEntry } from '../lottie-registry';
+import { LOTTIE_DRAG_TYPE } from './LottieLibrary';
 import { maxTransition, prevAdjacent, splitDuration, transitionLabel } from '../../shared/transitions';
 import { playhead, useFrame } from '../playhead';
 import { getThumb, onThumbsChange } from '../media';
@@ -397,7 +399,7 @@ export const Timeline: React.FC = () => {
   };
 
   // ---------- largar media ----------
-  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
+  const acceptsDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(MEDIA_DRAG_TYPE) || e.dataTransfer.types.includes(TEMPLATE_DRAG_TYPE) || e.dataTransfer.types.includes(LOTTIE_DRAG_TYPE) || e.dataTransfer.types.includes('Files');
 
   const onDrop = async (e: React.DragEvent, trackId: string | undefined, newTrack = false) => {
     e.preventDefault();
@@ -406,7 +408,14 @@ export const Timeline: React.FC = () => {
     const start = Math.max(0, Math.round(frameAtClientX(e.clientX)));
     const mediaId = e.dataTransfer.getData(MEDIA_DRAG_TYPE);
     const templateId = e.dataTransfer.getData(TEMPLATE_DRAG_TYPE);
-    if (templateId) {
+    const lottieId = e.dataTransfer.getData(LOTTIE_DRAG_TYPE);
+    const lottieEntry = lottieId ? getLottieEntry(lottieId) : undefined;
+    if (lottieEntry) {
+      commit((p) => {
+        const r = addLottieClip(p, { id: lottieEntry.id, name: lottieEntry.name, data: lottieEntry.data }, start, { trackId, newTrack, magnet: snap });
+        return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
+      });
+    } else if (templateId) {
       commit((p) => {
         const r = addTemplateClip(p, templateId, start, { trackId, newTrack, magnet: snap });
         return { project: r.project, select: r.clipId ? [r.clipId] : undefined };
@@ -655,6 +664,7 @@ const TrackRow: React.FC<TrackRowProps> = ({ track, mediaById, z, selection, dro
               key={clip.id}
               clip={clip}
               media={media}
+              lottieName={clip.lottie ? project.lotties?.[clip.lottie.assetId]?.name : undefined}
               trackKind={track.kind}
               z={z}
               fps={project.fps}
@@ -711,19 +721,20 @@ const ClipView: React.FC<{
   z: number;
   fps: number;
   selected: boolean;
+  lottieName?: string;
   onDown: (e: React.PointerEvent, mode: ClipMode) => void;
   onMenu: (e: React.MouseEvent) => void;
   onKeyframeDown: (e: React.PointerEvent, kf: Keyframe) => void;
-}> = React.memo(({ clip, media, trackKind, z, fps, selected, onDown, onMenu, onKeyframeDown }) => {
+}> = React.memo(({ clip, media, lottieName, trackKind, z, fps, selected, onDown, onMenu, onKeyframeDown }) => {
   const w = Math.max(2, clip.duration * z);
   const thumb = media ? getThumb(media.path) : undefined;
   // um vídeo numa pista de áudio (som separado) desenha-se como áudio
-  const kind = clip.text ? 'text' : clip.template ? 'template' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
+  const kind = clip.text ? 'text' : clip.template ? 'template' : clip.lottie ? 'lottie' : trackKind === 'audio' ? 'audio' : media?.kind ?? 'video';
   const fi = clip.fadeIn * z;
   const fo = clip.fadeOut * z;
   return (
     <div
-      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template ? '' : ' missing'}`}
+      className={`clip kind-${kind}${selected ? ' selected' : ''}${media || clip.text || clip.template || (clip.lottie && lottieName) ? '' : ' missing'}`}
       style={{ left: clip.start * z, width: w, backgroundImage: thumb && kind !== 'audio' ? `url(${thumb})` : undefined }}
       data-clip-id={clip.id}
       onPointerDown={(e) => onDown(e, 'move')}
@@ -737,7 +748,7 @@ const ClipView: React.FC<{
           {fo > 0 && <polygon points={`${w},0 ${w - fo},0 ${w},100`} />}
         </svg>
       )}
-      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : media?.name ?? 'Ficheiro em falta'}</span>}
+      {w > 36 && <span className="clip-name">{clip.text ? clip.text.text.split('\n')[0] || 'Texto' : clip.template ? `◆ ${getTemplate(clip.template.id)?.name ?? 'Modelo em falta'}` : clip.lottie ? `✦ ${lottieName ?? 'Animação em falta'}` : media?.name ?? 'Ficheiro em falta'}</span>}
       {clip.audioDetached && w > 60 && <span className="clip-badge" title="Som separado para uma pista de áudio"><Icon name="mute" size={11} /></span>}
       {!clip.audioDetached && clip.volume !== 1 && w > 80 && kind !== 'image' && <span className="clip-badge">{Math.round(clip.volume * 100)}%</span>}
       {clip.speed && clip.speed !== 1 && w > 50 && <span className="clip-badge speed">{String(clip.speed).replace('.', ',')}×</span>}

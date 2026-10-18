@@ -15,6 +15,7 @@ import { ExportModal, type ExportState } from './components/ExportModal';
 import { ExportOptionsModal, loadExportOptions } from './components/ExportOptions';
 import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '../shared/export';
 import { changeFps } from './ops';
+import { pruneLotties } from '../shared/lottie';
 import { Icon } from './components/Icon';
 
 type Toast = { id: number; msg: string; kind: 'info' | 'error' };
@@ -133,7 +134,7 @@ export const App: React.FC = () => {
 
   const doSave = async (saveAs = false) => {
     const s = stateRef.current;
-    const path = await api().saveProject(s.project, s.filePath, saveAs);
+    const path = await api().saveProject(pruneLotties(s.project), s.filePath, saveAs);
     if (path) { dispatch({ type: 'saved', filePath: path }); notify('Projeto guardado'); }
   };
 

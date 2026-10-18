@@ -52,6 +52,8 @@ export interface Clip {
   keyframes?: Keyframe[];
   /** Clips de modelo programático (mediaId vazio) */
   template?: { id: string; props: Record<string, unknown> };
+  /** Animação Lottie (os dados ficam embutidos em project.lotties) */
+  lottie?: { assetId: string; loop: boolean };
 }
 
 export type KfProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
@@ -156,6 +158,14 @@ export interface Track {
   clips: Clip[];
 }
 
+/** Animação Lottie embutida no projeto (vai com o ficheiro para outro computador) */
+export interface LottieAsset {
+  id: string;
+  name: string;
+  /** JSON Lottie (bodymovin) */
+  data: Record<string, unknown>;
+}
+
 export interface Project {
   version: 1;
   name: string;
@@ -166,6 +176,8 @@ export interface Project {
   media: MediaItem[];
   /** Ordem: índice 0 = pista de cima (fica por cima no vídeo) */
   tracks: Track[];
+  /** Animações Lottie usadas, por id */
+  lotties?: Record<string, LottieAsset>;
 }
 
 export interface CompositionProps {

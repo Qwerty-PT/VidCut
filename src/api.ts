@@ -8,6 +8,8 @@ export interface ExportProgress {
   message?: string;
 }
 
+export interface LottieLibItem { id: string; name: string; data: Record<string, unknown> }
+
 export interface AutosaveData { project: Project; filePath: string | null; dirty: boolean }
 
 export interface VidCutApi {
@@ -24,6 +26,10 @@ export interface VidCutApi {
   showItem(p: string): Promise<boolean>;
   peaks(file: string): Promise<Uint8Array>;
   nativeEdit(action: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'): Promise<boolean>;
+  lottieList(): Promise<LottieLibItem[]>;
+  lottieImport(paths?: string[]): Promise<{ added: LottieLibItem[]; errors: string[] }>;
+  lottieRemove(id: string): Promise<boolean>;
+  lottieRename(id: string, name: string): Promise<boolean>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
   onMenu(cb: (cmd: string) => void): () => void;
 }

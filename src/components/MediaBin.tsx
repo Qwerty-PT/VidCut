@@ -5,6 +5,7 @@ import { getThumb, onThumbsChange } from '../media';
 import { addClip, mediaInUse, removeMedia } from '../ops';
 import { playhead } from '../playhead';
 import { Icon } from './Icon';
+import { LottieLibrary } from './LottieLibrary';
 import { TemplateGallery } from './TemplateGallery';
 import type { MediaItem } from '../../shared/types';
 
@@ -21,7 +22,7 @@ export const MediaBin: React.FC = () => {
   const { state, commit, importPaths, notify } = useEditor();
   const [, force] = useState(0);
   const [dragOver, setDragOver] = useState(false);
-  const [tab, setTab] = useState<'media' | 'templates'>('media');
+  const [tab, setTab] = useState<'media' | 'templates' | 'lottie'>('media');
   useEffect(() => onThumbsChange(() => force((n) => n + 1)), []);
 
   const pick = async () => {
@@ -62,10 +63,11 @@ export const MediaBin: React.FC = () => {
         <div className="bin-tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'media'} className={tab === 'media' ? 'on' : ''} onClick={() => setTab('media')}>Media</button>
           <button role="tab" aria-selected={tab === 'templates'} className={tab === 'templates' ? 'on' : ''} onClick={() => setTab('templates')}>Modelos</button>
+          <button role="tab" aria-selected={tab === 'lottie'} className={tab === 'lottie' ? 'on' : ''} onClick={() => setTab('lottie')}>Animações</button>
         </div>
         {tab === 'media' && <button className="btn small" onClick={pick}><Icon name="import" size={16} /> Importar</button>}
       </header>
-      {tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
+      {tab === 'lottie' ? <LottieLibrary /> : tab === 'templates' ? <TemplateGallery /> : media.length === 0 ? (
         <button className="empty-drop" onClick={pick}>
           <Icon name="import" size={28} />
           <strong>Importar media</strong>

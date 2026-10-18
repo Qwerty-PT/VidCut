@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('vidcut', {
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   peaks: (file) => ipcRenderer.invoke('media:peaks', file),
   nativeEdit: (action) => ipcRenderer.invoke('edit:native', action),
+  lottieList: () => ipcRenderer.invoke('lottie:list'),
+  lottieImport: (paths) => ipcRenderer.invoke('lottie:import', paths),
+  lottieRemove: (id) => ipcRenderer.invoke('lottie:remove', id),
+  lottieRename: (id, name) => ipcRenderer.invoke('lottie:rename', id, name),
   onExportProgress: (cb) => {
     const h = (_e, p) => cb(p);
     ipcRenderer.on('export:progress', h);

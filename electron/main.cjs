@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const { createMediaServer } = require('./media-server.cjs');
 const { renderProject } = require('./render.cjs');
 const { getPeaks } = require('./peaks.cjs');
+const { createLottieLibrary } = require('./lottie-lib.cjs');
 
 const isDev = process.env.VIDCUT_DEV === '1';
 const appRoot = path.join(__dirname, '..');
@@ -196,6 +197,25 @@ ipcMain.handle('export:start', async (_e, { project, spec }) => {
 });
 
 ipcMain.handle('export:cancel', () => { currentExport?.cancel(); return true; });
+
+// ---------- biblioteca de animações Lottie ----------
+let lottieLib = null;
+const lib = () => (lottieLib ??= createLottieLibrary(path.join(app.getPath('userData'), 'lotties')));
+ipcMain.handle('lottie:list', () => lib().list());
+ipcMain.handle('lottie:import', async (_e, paths) => {
+  let files = Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : [];
+  if (!files.length) {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Adicionar animações Lottie', properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Animações Lottie', extensions: ['json', 'lottie'] }],
+    });
+    if (r.canceled) return { added: [], errors: [] };
+    files = r.filePaths;
+  }
+  return lib().import(files);
+});
+ipcMain.handle('lottie:remove', (_e, id) => lib().remove(String(id)));
+ipcMain.handle('lottie:rename', (_e, id, name) => lib().rename(String(id), String(name)));
 
 ipcMain.handle('media:peaks', async (_e, file) => {
   try { return new Uint8Array(await getPeaks(file, path.join(app.getPath('userData'), 'peaks'))); }

@@ -1,12 +1,13 @@
 import React from 'react';
 import { useEditor } from '../editor-context';
-import { TRANSITION_PREFIX, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
+import { TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
 import { AnimSection, ColorSection, SpeedSection, TemplateFields, TextFields, TransformSection } from './ClipPanels';
 import { getTemplate } from '../../shared/templates';
+import { clipLottie, lottieInfo, lottieMedia } from '../../shared/lottie';
 import type { MediaItem, Project, TransitionDir, TransitionType } from '../../shared/types';
 import { DIRECTIONAL, DIR_LABELS, TRANSITIONS, maxTransition, prevAdjacent } from '../../shared/transitions';
 import { DURATIONS_MS, msToFrames } from '../../shared/motion';
@@ -118,8 +119,10 @@ export const Inspector: React.FC = () => {
   const { clip, track } = found;
   const tplDef = clip.template ? getTemplate(clip.template.id) : undefined;
   // modelos comportam-se como uma imagem do tamanho do quadro (enquadrar, cor, animação)
+  const lottieAsset = clipLottie(project, clip);
   const media: MediaItem | undefined = clip.template
     ? { id: '', path: '', name: tplDef?.name ?? 'Modelo', kind: 'image', durationSec: 0, width: project.width, height: project.height }
+    : clip.lottie ? lottieMedia(lottieAsset)
     : project.media.find((m) => m.id === clip.mediaId);
   const fps = project.fps;
   const maxFade = Math.max(0, Math.floor(clip.duration / 2));
@@ -182,6 +185,18 @@ export const Inspector: React.FC = () => {
             </dl>
             {actions}
             {clip.template && (tplDef ? <TemplateFields clip={clip} def={tplDef} /> : <p className="hint">Este modelo já não existe na pasta modelos/.</p>)}
+            {clip.lottie && (lottieAsset ? (
+              <div className="audio-box">
+                <label className="check">
+                  <input type="checkbox" checked={clip.lottie.loop} onChange={(e) => commit((p) => setLottieLoop(p, clip.id, e.target.checked))} />
+                  Repetir em loop
+                </label>
+                <p className="hint">
+                  Animação de {lottieInfo(lottieAsset.data).durationSec.toFixed(1).replace('.', ',')} s ({lottieInfo(lottieAsset.data).w}×{lottieInfo(lottieAsset.data).h}).
+                  {clip.lottie.loop ? ' Estica o clip na timeline para a repetir.' : ' Se o clip for mais comprido, fica parada no último fotograma.'} Vai guardada dentro do projeto.
+                </p>
+              </div>
+            ) : <p className="hint">Os dados desta animação não estão no projeto.</p>)}
 
             {media?.kind === 'video' && isVisual && (
               <div className="audio-box">
@@ -225,7 +240,7 @@ export const Inspector: React.FC = () => {
                 : 'No áudio, o fade sobe/desce o volume.'}
             </p>
 
-            {media && media.kind !== 'image' && <SpeedSection clip={clip} fps={fps} />}
+            {((media && media.kind !== 'image') || clip.lottie) && <SpeedSection clip={clip} fps={fps} />}
           </>
         )}
         {curTab === 'frame' && media && <TransformSection clip={clip} media={media} />}

@@ -1,0 +1,114 @@
+[
+ {
+  "id": "visto",
+  "name": "Visto",
+  "category": "Ícones",
+  "file": "visto.json"
+ },
+ {
+  "id": "erro",
+  "name": "Erro",
+  "category": "Ícones",
+  "file": "erro.json"
+ },
+ {
+  "id": "coracao",
+  "name": "Coração",
+  "category": "Ícones",
+  "file": "coracao.json"
+ },
+ {
+  "id": "estrela",
+  "name": "Estrela",
+  "category": "Ícones",
+  "file": "estrela.json"
+ },
+ {
+  "id": "seta-baixo",
+  "name": "Seta para baixo",
+  "category": "Ícones",
+  "file": "seta-baixo.json"
+ },
+ {
+  "id": "seta-direita",
+  "name": "Seta para a direita",
+  "category": "Ícones",
+  "file": "seta-direita.json"
+ },
+ {
+  "id": "confetes",
+  "name": "Confetes",
+  "category": "Celebração",
+  "file": "confetes.json",
+  "thumb": 0.3
+ },
+ {
+  "id": "fogo-artificio",
+  "name": "Fogo de artifício",
+  "category": "Celebração",
+  "file": "fogo-artificio.json",
+  "thumb": 0.42
+ },
+ {
+  "id": "sino",
+  "name": "Sino de aviso",
+  "category": "Social",
+  "file": "sino.json"
+ },
+ {
+  "id": "partilhar",
+  "name": "Partilhar",
+  "category": "Social",
+  "file": "partilhar.json"
+ },
+ {
+  "id": "sublinhado",
+  "name": "Sublinhado",
+  "category": "Desenhado à mão",
+  "file": "sublinhado.json"
+ },
+ {
+  "id": "circulo-mao",
+  "name": "Círculo à mão",
+  "category": "Desenhado à mão",
+  "file": "circulo-mao.json"
+ },
+ {
+  "id": "seta-desenhada",
+  "name": "Seta desenhada",
+  "category": "Desenhado à mão",
+  "file": "seta-desenhada.json"
+ },
+ {
+  "id": "marcador",
+  "name": "Marcador",
+  "category": "Desenhado à mão",
+  "file": "marcador.json"
+ },
+ {
+  "id": "carregamento",
+  "name": "Carregamento",
+  "category": "Interface",
+  "file": "carregamento.json"
+ },
+ {
+  "id": "pontos",
+  "name": "Três pontos",
+  "category": "Interface",
+  "file": "pontos.json",
+  "thumb": 0.25
+ },
+ {
+  "id": "progresso",
+  "name": "Barra de progresso",
+  "category": "Interface",
+  "file": "progresso.json"
+ },
+ {
+  "id": "clique",
+  "name": "Clique",
+  "category": "Interface",
+  "file": "clique.json",
+  "thumb": 0.4
+ }
+]
