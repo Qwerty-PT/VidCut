@@ -11,7 +11,7 @@ export default defineTemplate({
   opaque: true,
   fields: [
     { key: 'titulo', label: 'Título', type: 'text', default: 'Obrigado!' },
-    { key: 'texto', label: 'Créditos (Função: Nome)', type: 'textarea', default: 'Realização: Nuno\nMúsica: Banda da Festa\n\nUm agradecimento especial: a todos os convidados' },
+    { key: 'texto', label: 'Créditos (Função: Nome)', type: 'textarea', default: 'Realização: Nuno\nMúsica: Nome da banda\n\nUm agradecimento especial: a todos os convidados' },
     { key: 'fundo', label: 'Fundo', type: 'color', default: '#000000' },
     { key: 'cor', label: 'Cor do texto', type: 'color', default: '#ffffff' },
     { key: 'destaque', label: 'Cor das funções', type: 'color', default: '#f2b33d' },

@@ -10,8 +10,8 @@ export default defineTemplate({
   durationSec: 5,
   opaque: true,
   fields: [
-    { key: 'titulo', label: 'Mensagem', type: 'text', default: 'Até à próxima festa!' },
-    { key: 'contacto', label: 'Contacto / site', type: 'text', default: 'o-teu-site.pt' },
+    { key: 'titulo', label: 'Mensagem', type: 'text', default: 'Obrigado por veres!' },
+    { key: 'contacto', label: 'Contacto / site', type: 'text', default: 'www.exemplo.pt' },
     { key: 'fundo', label: 'Fundo', type: 'color', default: '#17191e' },
     { key: 'cor', label: 'Cor do texto', type: 'color', default: '#ffffff' },
     { key: 'destaque', label: 'Cor do botão', type: 'color', default: '#f2b33d' },

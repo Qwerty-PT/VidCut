@@ -10,7 +10,7 @@ export default defineTemplate({
   durationSec: 6,
   opaque: true,
   fields: [
-    { key: 'titulo', label: 'Título', type: 'text', default: 'Festas por mês' },
+    { key: 'titulo', label: 'Título', type: 'text', default: 'Vendas por mês' },
     { key: 'dados', label: 'Dados (Rótulo: valor, um por linha)', type: 'textarea', default: 'Janeiro: 12\nFevereiro: 18\nMarço: 25\nAbril: 21' },
     { key: 'sufixo', label: 'Sufixo dos valores', type: 'text', default: '' },
     { key: 'fundo', label: 'Fundo', type: 'color', default: '#17191e' },

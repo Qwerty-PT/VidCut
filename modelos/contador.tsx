@@ -13,7 +13,7 @@ export default defineTemplate({
     { key: 'valor', label: 'Valor final', type: 'number', default: 1250, min: 0, max: 10000000 },
     { key: 'prefixo', label: 'Prefixo', type: 'text', default: '' },
     { key: 'sufixo', label: 'Sufixo', type: 'text', default: '+' },
-    { key: 'legenda', label: 'Legenda', type: 'text', default: 'crianças felizes' },
+    { key: 'legenda', label: 'Legenda', type: 'text', default: 'clientes satisfeitos' },
     { key: 'cor', label: 'Cor', type: 'color', default: '#ffffff' },
     { key: 'destaque', label: 'Cor do número', type: 'color', default: '#f2b33d' },
   ],

@@ -10,8 +10,8 @@ export default defineTemplate({
   durationSec: 6,
   opaque: true,
   fields: [
-    { key: 'titulo', label: 'Título', type: 'text', default: 'Programa da festa' },
-    { key: 'itens', label: 'Itens (um por linha)', type: 'textarea', default: 'Receção\nJogos\nBolo\nFotografias' },
+    { key: 'titulo', label: 'Título', type: 'text', default: 'Agenda' },
+    { key: 'itens', label: 'Itens (um por linha)', type: 'textarea', default: 'Introdução\nDemonstração\nPerguntas\nPróximos passos' },
     { key: 'fundo', label: 'Fundo', type: 'color', default: '#17191e' },
     { key: 'cor', label: 'Cor do texto', type: 'color', default: '#ffffff' },
     { key: 'destaque', label: 'Cor de destaque', type: 'color', default: '#f2b33d' },
