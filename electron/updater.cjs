@@ -199,7 +199,11 @@ function createUpdater({ send }) {
       // o processo novo não pode herdar as variáveis do AppImage antigo (apontam para a pasta montada que vai desaparecer)
       const env = { ...process.env };
       for (const k of ['APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-      spawn(target, process.argv.slice(1).filter((a) => a !== '.'), { detached: true, stdio: 'ignore', env }).unref();
+      const out = process.env.VIDCUT_UPDATE_LOG ? fs.openSync(process.env.VIDCUT_UPDATE_LOG, 'a') : 'ignore';
+      // espera que esta instância feche antes de abrir a nova (dados da app e portas livres)
+      const args = process.argv.slice(1).filter((a) => a !== '.');
+      spawn('/bin/sh', ['-c', `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done; sleep 1; exec "$0" "$@"`, target, ...args],
+        { detached: true, stdio: ['ignore', out, out], env }).unref();
       app.quit();
       return true;
     }
