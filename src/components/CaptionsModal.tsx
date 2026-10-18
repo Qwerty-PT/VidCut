@@ -3,7 +3,7 @@ import { useEditor } from '../editor-context';
 import { api, type CaptionsStatus } from '../api';
 import { addCaptionTrack, findClip } from '../ops';
 import { closeCaptions } from '../captions-ui';
-import { CAPTION_STYLES, DEFAULT_HIGHLIGHT, groupIntoPages, pagesToClips } from '../../shared/captions';
+import { CAPTION_STYLES, DEFAULT_HIGHLIGHT, groupIntoPages, normalizeWordTimes, pagesToClips } from '../../shared/captions';
 import { clipSpeed, type CaptionStyle } from '../../shared/types';
 import { Segmented } from './Fields';
 
@@ -59,11 +59,11 @@ export const CaptionsModal: React.FC<{ clipId: string }> = ({ clipId }) => {
     try {
       const r = await api().captionsStart({
         file: media.path, startSec: clip.trimStart / fps, durSec, model: prefs.model,
-        language: prefs.language === 'auto' ? null : prefs.language,
+        language: prefs.language, // 'auto' tem de ir explícito: sem língua o Whisper assume inglês
       });
       if (r.canceled) { setPhase({ k: 'setup' }); return; }
       if (!r.ok || !r.captions) { setPhase({ k: 'error', error: r.error || 'Erro desconhecido' }); return; }
-      const pages = groupIntoPages(r.captions);
+      const pages = groupIntoPages(normalizeWordTimes(r.captions));
       if (!pages.length) { setPhase({ k: 'error', error: 'Não foi detetada fala neste clip.' }); return; }
       const clips = pagesToClips(pages, { fps, startFrame: clip.start, speed: sp, style: prefs.style, highlight: prefs.highlight, endFrame: clip.start + clip.duration });
       commit((p) => { const t = addCaptionTrack(p, clips); return { project: t.project, select: [clips[0].id] }; });

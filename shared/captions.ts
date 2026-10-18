@@ -13,6 +13,44 @@ export const CAPTION_STYLES: { style: CaptionStyle; label: string; hint: string 
 
 export const DEFAULT_HIGHLIGHT = '#F2B33D';
 
+/**
+ * O Whisper dá durações minúsculas a palavras curtas ("estou" 60 ms, "a" 20 ms), que no ecrã
+ * duram menos de um fotograma e "desaparecem". Garante uma duração mínima a cada palavra,
+ * tirando tempo às vizinhas mais compridas (primeiro à anterior, depois à seguinte), sem mexer
+ * no início da primeira nem no fim da última palavra de cada bloco de fala.
+ */
+export function normalizeWordTimes(words: TimedWord[], minMs = 200, floorMs = 110): TimedWord[] {
+  const w = words.filter((x) => x.text.trim()).map((x) => ({ ...x, endMs: Math.max(x.endMs, x.startMs) }));
+  // fecha pequenas sobreposições
+  for (let i = 1; i < w.length; i++) if (w[i].startMs < w[i - 1].endMs) w[i].startMs = w[i - 1].endMs = Math.round((w[i].startMs + w[i - 1].endMs) / 2);
+  const dur = (i: number) => w[i].endMs - w[i].startMs;
+  for (const target of [minMs, floorMs]) {
+    for (let i = 0; i < w.length; i++) {
+      let need = target - dur(i);
+      if (need <= 0) continue;
+      // 1) tirar à palavra anterior, se estiverem coladas (sem pausa)
+      if (i > 0 && w[i].startMs - w[i - 1].endMs < 60) {
+        const give = Math.min(need, Math.max(0, dur(i - 1) - target));
+        if (give > 0) { w[i - 1].endMs -= give; w[i].startMs = w[i - 1].endMs; need -= give; }
+      } else if (i > 0) {
+        // há uma pausa antes: pode começar mais cedo, dentro da pausa
+        const room = w[i].startMs - w[i - 1].endMs;
+        const give = Math.min(need, room);
+        w[i].startMs -= give; need -= give;
+      }
+      // 2) tirar à seguinte
+      if (need > 0 && i < w.length - 1 && w[i + 1].startMs - w[i].endMs < 60) {
+        const give = Math.min(need, Math.max(0, dur(i + 1) - target));
+        if (give > 0) { w[i + 1].startMs += give; w[i].endMs = w[i + 1].startMs; need -= give; }
+      } else if (need > 0) {
+        const room = i < w.length - 1 ? w[i + 1].startMs - w[i].endMs : need;
+        w[i].endMs += Math.min(need, room);
+      }
+    }
+  }
+  return w;
+}
+
 /** Agrupa palavras em "páginas" legíveis: até ~7 palavras / 38 caracteres, quebra em pausas e pontuação */
 export function groupIntoPages(words: TimedWord[], opts: { maxWords?: number; maxChars?: number; maxGapMs?: number; maxMs?: number } = {}): CaptionPage[] {
   const maxWords = opts.maxWords ?? 7, maxChars = opts.maxChars ?? 38, maxGap = opts.maxGapMs ?? 700, maxMs = opts.maxMs ?? 3500;
