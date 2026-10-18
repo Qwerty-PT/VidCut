@@ -12,7 +12,6 @@
   <a href="https://github.com/Qwerty-PT/VidCut/releases/latest"><img src="https://img.shields.io/github/v/release/Qwerty-PT/VidCut?label=vers%C3%A3o&color=f2b33d&labelColor=17191e" alt="Última versão"></a>
   <img src="https://img.shields.io/badge/Mac%20%C2%B7%20Windows%20%C2%B7%20Linux-17191e?logo=electron&logoColor=9fe3f0" alt="Mac, Windows e Linux">
   <img src="https://img.shields.io/badge/em-portugu%C3%AAs-17191e?labelColor=17191e&color=4f6fa3" alt="Em português">
-  <a href="https://github.com/Qwerty-PT/VidCut/releases"><img src="https://img.shields.io/github/downloads/Qwerty-PT/VidCut/total?label=transfer%C3%AAncias&color=3f9284&labelColor=17191e" alt="Transferências"></a>
 </p>
 
 <p align="center">
