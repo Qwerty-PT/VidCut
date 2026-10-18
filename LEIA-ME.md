@@ -50,6 +50,8 @@ Estado: **fase 1 concluída** (base do editor). Ver o plano no fim.
 
 - **Pré-visualização no ecrã principal:** numa transição, passar o rato mostra-a entre os teus dois clips (em loop, ±0,5 s à volta do corte) e clicar aplica e continua a mostrar; nos modelos e animações, um clique mostra-os por cima do vídeo na cabeça de leitura (duplo clique adiciona). Etiqueta "Pré-visualização" no ecrã; Esc, espaço, clique fora ou qualquer edição termina e a cabeça de leitura volta onde estava. Fica fora do histórico (não é uma edição)
 
+- **Formato do projeto sem começar de novo:** botão de proporção por baixo do ecrã (16:9, 9:16, 1:1, 4:5, 4:3, 21:9, Personalizado — mantém o lado menor, ex.: 1080) e janela **Definições do projeto** (nome, formato em cartões, qualidade 720p–4K, fps, cor de fundo), aberta pelo nome do projeto no topo, por Ficheiro → Definições do projeto (Cmd+,) ou pelo botão "Modificar…" no painel Projeto. Tudo num só passo, desfazível
+
 ## Requisitos
 
 - Node.js 20 ou superior
@@ -211,6 +213,7 @@ Grátis para uso individual e empresas até 3 pessoas. Uso pessoal está coberto
   - Lotties usados ficam embutidos no próprio ficheiro do projeto (são pequenos) — abre noutro computador mesmo sem a animação na biblioteca de lá; ao abrir, oferece acrescentá-la à biblioteca local
   - Modelos próprios em falta no outro computador: aviso claro (nome do modelo) e o clip mantém-se, pronto a voltar quando o modelo for instalado
 - Formas: retângulos, círculos, linhas e setas, animáveis com keyframes
+- **Fundo desfocado** (como o CapCut): ao mudar de formato (ex.: 16:9 → 9:16), encher as barras com uma versão desfocada e ampliada do próprio vídeo — opção do projeto ou por clip, com intensidade do desfoque
 - Vídeos em lote: um modelo + uma lista → um vídeo por linha
 - **Ecrã verde (chroma key):** remover fundo verde/azul de um clip — conta-gotas para a cor, tolerância, suavidade das arestas e remoção do reflexo verde (spill); funciona na pré-visualização e no export
 - **Aceleração por hardware no export (Mac):** VideoToolbox para H.264, HEVC e ProRes (opção "Rápido (hardware)" no diálogo de export; usa bitrate em vez de CRF); noutros sistemas fica desligada

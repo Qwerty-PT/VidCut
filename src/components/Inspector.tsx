@@ -3,6 +3,8 @@ import { useEditor } from '../editor-context';
 import { TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { openCaptions } from '../captions-ui';
+import { openProjectSettings } from '../project-settings-ui';
+import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
 import { Icon } from './Icon';
 import { Range, Row, Segmented } from './Fields';
@@ -81,6 +83,9 @@ export const Inspector: React.FC = () => {
       <aside className="panel inspector">
         <header className="panel-head"><h2>Projeto</h2></header>
         <div className="inspector-body">
+          <button className="btn block" onClick={openProjectSettings} title="Formato, resolução, fps e fundo (Cmd+,)">
+            <Icon name="settings" size={16} /> Modificar… <span className="btn-meta">{aspectLabel(project.width, project.height)} · {project.width}×{project.height}</span>
+          </button>
           <Row label="Nome">
             <input
               type="text" value={project.name}

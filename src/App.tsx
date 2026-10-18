@@ -17,6 +17,9 @@ import { FORMATS, buildSpec, exportFps, rangeFrames, type ExportOptions } from '
 import { changeFps } from './ops';
 import { pruneLotties } from '../shared/lottie';
 import { CaptionsModal } from './components/CaptionsModal';
+import { ProjectSettingsModal } from './components/ProjectSettings';
+import { openProjectSettings, useProjectSettingsOpen } from './project-settings-ui';
+import { aspectLabel } from '../shared/aspect';
 import { useCaptionsTarget } from './captions-ui';
 import { pagesToClips, parseSrt, srtToPages, toSrt } from '../shared/captions';
 import { addCaptionTrack } from './ops';
@@ -32,6 +35,7 @@ export const App: React.FC = () => {
   const [exporting, setExporting] = useState<ExportState | null>(null);
   const [exportSetup, setExportSetup] = useState(false);
   const captionsTarget = useCaptionsTarget();
+  const projectSettingsOpen = useProjectSettingsOpen();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const clipboard = useRef<ClipboardData | null>(null);
@@ -222,6 +226,7 @@ export const App: React.FC = () => {
         case 'import': a.doImport(); break;
         case 'export': a.doExport(); break;
         case 'importSrt': a.doImportSrt(); break;
+        case 'projectSettings': openProjectSettings(); break;
         case 'exportSrt': a.doExportSrt(); break;
         case 'undo': if (typing) api().nativeEdit('undo'); else dispatch({ type: 'undo' }); break;
         case 'redo': if (typing) api().nativeEdit('redo'); else dispatch({ type: 'redo' }); break;
@@ -254,7 +259,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e) || exporting || exportSetup || captionsTarget) return;
+      if (isTyping(e) || exporting || exportSetup || captionsTarget || projectSettingsOpen) return;
       const s = stateRef.current;
       const dur = projectDuration(s.project);
       const mod = e.ctrlKey || e.metaKey;
@@ -293,7 +298,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commit, exporting, exportSetup, captionsTarget]);
+  }, [commit, exporting, exportSetup, captionsTarget, projectSettingsOpen]);
 
   const ctx = useMemo<EditorCtx | null>(
     () => (mediaBase === null ? null : { state, dispatch, commit, mediaBase, importPaths, notify }),
@@ -315,9 +320,10 @@ export const App: React.FC = () => {
       <div className="app">
         <header className="topbar">
           <div className="brand"><span className="logo" aria-hidden>▶</span> VidCut</div>
-          <div className="project-name" title={state.filePath ?? 'Ainda não guardado'}>
+          <button className="project-name" onClick={openProjectSettings} title={`${state.filePath ?? 'Ainda não guardado'}\nClica para as definições do projeto (Cmd+,)`}>
             {state.project.name}{dirty && <span className="dirty" title="Alterações por guardar">•</span>}
-          </div>
+            <span className="project-meta">{aspectLabel(state.project.width, state.project.height)} · {state.project.width}×{state.project.height} · {state.project.fps} fps</span>
+          </button>
           <div className="top-actions">
             <button className="btn ghost" onClick={doOpen} title="Abrir projeto (Ctrl+O)"><Icon name="open" size={16} /> Abrir</button>
             <button className="btn ghost" onClick={() => doSave(false)} title="Guardar (Ctrl+S)"><Icon name="save" size={16} /> Guardar</button>
@@ -338,6 +344,7 @@ export const App: React.FC = () => {
           {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.msg}</div>)}
         </div>
         {captionsTarget && <CaptionsModal clipId={captionsTarget} />}
+        {projectSettingsOpen && <ProjectSettingsModal />}
         {exportSetup && (
           <ExportOptionsModal
             project={state.project}

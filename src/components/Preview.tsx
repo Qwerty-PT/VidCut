@@ -9,6 +9,7 @@ import { findClip, setAnimatedProps } from '../ops';
 import { valuesAt } from '../../shared/keyframes';
 import { Icon } from './Icon';
 import { TransformOverlay } from './TransformOverlay';
+import { AspectMenu } from './AspectMenu';
 import { clearPreview, getPreview, usePreviewOverride } from '../preview-override';
 
 export const Preview: React.FC = () => {
@@ -145,7 +146,10 @@ const Transport: React.FC<{ duration: number; fps: number }> = ({ duration, fps 
         <button className="icon-btn" title="Frame seguinte (→)" onClick={() => playhead.seek(Math.min(duration - 1, frame + 1))}><Icon name="next" /></button>
         <button className="icon-btn" title="Fim (End)" onClick={() => playhead.seek(duration - 1)}><Icon name="end" /></button>
       </div>
-      <span className="tc dim">{timecode(duration, fps)}</span>
+      <div className="transport-right">
+        <AspectMenu />
+        <span className="tc dim">{timecode(duration, fps)}</span>
+      </div>
     </div>
   );
 };

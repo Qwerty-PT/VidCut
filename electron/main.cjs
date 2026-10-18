@@ -85,6 +85,7 @@ function buildMenu() {
         { label: 'Abrir projeto…', accelerator: 'CmdOrCtrl+O', click: send('open') },
         { label: 'Guardar', accelerator: 'CmdOrCtrl+S', click: send('save') },
         { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', click: send('saveAs') },
+        { label: 'Definições do projeto…', accelerator: 'CmdOrCtrl+,', click: send('projectSettings') },
         { type: 'separator' },
         { label: 'Importar media…', accelerator: 'CmdOrCtrl+I', click: send('import') },
         { label: 'Exportar vídeo…', accelerator: 'CmdOrCtrl+E', click: send('export') },
