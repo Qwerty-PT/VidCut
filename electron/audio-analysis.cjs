@@ -23,12 +23,17 @@ function run(args, { onStdout } = {}) {
 const seekArgs = (start, dur) => [...(start > 0 ? ['-ss', start.toFixed(3)] : []), ...(dur > 0 ? ['-t', dur.toFixed(3)] : [])];
 
 /** Som em mono como Float32Array (via WAV 16 bits: o ffmpeg do Remotion não tem o formato cru) */
-async function decodePcm(file, rate, start = 0, dur = 0) {
+async function decodePcm(file, rate, start = 0, dur = 0, onProgress) {
   const chunks = [];
-  let header = Buffer.alloc(0), inData = false;
+  let header = Buffer.alloc(0), inData = false, got = 0, lastP = 0;
+  const expected = dur > 0 ? dur * rate * 2 : 0;
   await run(['-v', 'error', ...seekArgs(start, dur), '-i', file, '-vn', '-ac', '1', '-ar', String(rate), '-acodec', 'pcm_s16le', '-bitexact', '-map_metadata', '-1', '-f', 'wav', '-'], {
     onStdout: (c) => {
-      if (inData) { chunks.push(c); return; }
+      if (inData) {
+        chunks.push(c); got += c.length;
+        if (onProgress && expected && got - lastP > expected / 100) { lastP = got; onProgress(Math.min(0.99, got / expected)); }
+        return;
+      }
       header = Buffer.concat([header, c]);
       const i = header.indexOf('data');
       if (i < 0 || header.length < i + 8) return;
@@ -264,9 +269,9 @@ async function detectScenes(file, { start = 0, dur = 0, fps = 30, sensitivity = 
 // Envelope de energia (para cortar silêncios e detetar voz): dB por bloco de 20 ms
 // ---------------------------------------------------------------------------
 const ENV_HOP = 0.02;
-async function energyEnvelope(file, start = 0, dur = 0) {
+async function energyEnvelope(file, start = 0, dur = 0, onProgress) {
   const rate = 16000;
-  const x = await decodePcm(file, rate, start, dur);
+  const x = await decodePcm(file, rate, start, dur, onProgress);
   const n = Math.round(rate * ENV_HOP);
   const frames = Math.floor(x.length / n);
   const db = new Array(frames);

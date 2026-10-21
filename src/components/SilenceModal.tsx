@@ -14,6 +14,8 @@ export const SilenceModal: React.FC<{ clipId: string }> = ({ clipId }) => {
   const [env, setEnv] = useState<{ hop: number; db: number[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [o, setO] = useState<SpeechOpts>(DEFAULT_SPEECH);
+  const [prog, setProg] = useState(0);
+  useEffect(() => window.vidcut?.onMediaProgress((e) => { if (e.task === 'envelope') setProg(e.p); }), []);
   useEffect(() => {
     if (!f) return;
     void clipEnvelope(state.project, f.clip).then((r) => ('error' in r ? setErr(r.error) : setEnv(r)));
@@ -25,7 +27,9 @@ export const SilenceModal: React.FC<{ clipId: string }> = ({ clipId }) => {
   const removed = ranges.reduce((s, [a, b]) => s + b - a, 0);
   const W = 600, H = 70;
   const thr = env ? speechThreshold(env.db, o.sensitivity) : -60;
-  const lo = env ? Math.min(...env.db) : -80, hi = env ? Math.max(...env.db) : 0;
+  // (sem Math.min(...arr): com vídeos longos são centenas de milhares de valores e rebenta a pilha)
+  let lo = -80, hi = 0;
+  if (env && env.db.length) { lo = Infinity; hi = -Infinity; for (const v of env.db) { if (v < lo) lo = v; if (v > hi) hi = v; } }
   const y = (db: number) => H - ((db - lo) / Math.max(1, hi - lo)) * (H - 4) - 2;
   const wave = env ? (() => {
     const step = Math.max(1, Math.floor(env.db.length / W));
@@ -41,7 +45,12 @@ export const SilenceModal: React.FC<{ clipId: string }> = ({ clipId }) => {
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
       <div className="modal silence-modal" role="dialog" aria-modal="true" aria-labelledby="sil-title">
         <h3 id="sil-title">Cortar silêncios</h3>
-        {err ? <p className="error-box">{err}</p> : !env ? <p className="hint">A ouvir o clip…</p> : (
+        {err ? <p className="error-box">{err}</p> : !env ? (
+          <div className="sil-wait">
+            <p className="hint">A ouvir o clip… {prog > 0 ? `${Math.round(prog * 100)}%` : ''} {f.clip.duration / state.project.fps > 300 ? '(vídeos longos demoram um bocadinho)' : ''}</p>
+            <div className="progress"><div className="progress-bar" style={{ width: `${Math.max(3, prog * 100)}%` }} /></div>
+          </div>
+        ) : (
           <>
             <svg className="sil-graph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label="Som do clip com as pausas a cortar">
               {ranges.map(([a, b], i) => (

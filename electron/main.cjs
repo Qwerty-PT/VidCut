@@ -406,7 +406,7 @@ ipcMain.handle('video:scenes', async (_e, { file, start, dur, fps, sensitivity }
 
 ipcMain.handle('audio:envelope', async (_e, { file, start, dur }) => {
   if (!okFile(file)) return { error: 'Ficheiro não encontrado.' };
-  try { return await analysis.energyEnvelope(file, Math.max(0, Number(start) || 0), Math.max(0, Number(dur) || 0)); }
+  try { return await analysis.energyEnvelope(file, Math.max(0, Number(start) || 0), Math.max(0, Number(dur) || 0), (p) => win?.webContents.send('media:progress', { task: 'envelope', p })); }
   catch (e) { return { error: String(e.message || e).slice(0, 300) }; }
 });
 ipcMain.handle('audio:denoise', async (_e, { file, strength }) => {

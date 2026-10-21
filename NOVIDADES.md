@@ -2,6 +2,11 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.24.2
+
+- Cortar silêncios em vídeos longos (mais de ~40 min): o ecrã ficava preto — corrigido; a janela mostra agora o progresso enquanto ouve o clip
+- Se a interface encontrar um erro, aparece uma mensagem com "Recarregar" em vez de um ecrã preto (o projeto fica na gravação automática)
+
 ## 0.24.1
 
 - Mac: corrigido o erro "ENOTEMPTY: directory not empty" ao atualizar, quando tinha ficado uma atualização antiga a meio

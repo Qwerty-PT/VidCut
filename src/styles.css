@@ -1046,3 +1046,11 @@ body.vol-dragging, body.vol-dragging * { cursor: grabbing !important; }
 .relink-list li.ok { color: #6fd39f; }
 .rl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .rl-ok { font: 11px var(--mono); }
+
+/* ---------- erro da interface ---------- */
+.crash { max-width: 620px; margin: 12vh auto; padding: 28px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.crash h1 { margin: 0; font-size: 20px; }
+.crash p { margin: 0; color: var(--text-dim); }
+.crash pre { margin: 0; padding: 10px; border-radius: 6px; background: var(--bg); color: #f0a49c; font: 12px/1.5 var(--mono); white-space: pre-wrap; user-select: text; }
+.crash-actions { display: flex; gap: 8px; }
+.sil-wait { display: flex; flex-direction: column; gap: 8px; }
