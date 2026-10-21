@@ -375,7 +375,7 @@ export const App: React.FC = () => {
         <div className="toasts">
           {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.msg}</div>)}
         </div>
-        {captionsTarget && <CaptionsModal clipId={captionsTarget} />}
+        {captionsTarget && <CaptionsModal ids={captionsTarget} />}
         {projectSettingsOpen && <ProjectSettingsModal />}
         {modal?.kind === 'silence' && <SilenceModal clipId={modal.clipId} />}
         {modal?.kind === 'templates' && <ProjectTemplatesModal />}

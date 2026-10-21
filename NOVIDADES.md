@@ -2,6 +2,12 @@
 
 Cada versão tem uma secção `## X.Y.Z`. Ao publicar, o texto da secção vai para a página da versão no GitHub e aparece no aviso de atualização da app.
 
+## 0.24.3
+
+- Legendas para o vídeo todo, mesmo com muitos cortes: no painel do projeto (sem nada selecionado) há **Gerar legendas do vídeo**; a partir de um clip escolhes "Só este clip" ou "Vídeo todo"; com vários clips selecionados, legenda só esses
+- Cada ficheiro é transcrito uma só vez (não corte a corte) e as palavras vão para o sítio certo de cada pedaço, incluindo velocidade e curvas de velocidade; o que foi cortado não aparece
+- Tudo numa só pista "Legendas"
+
 ## 0.24.2
 
 - Cortar silêncios em vídeos longos (mais de ~40 min): o ecrã ficava preto — corrigido; a janela mostra agora o progresso enquanto ouve o clip

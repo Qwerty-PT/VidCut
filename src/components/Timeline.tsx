@@ -741,7 +741,7 @@ export const Timeline: React.FC = () => {
               </button>
             )}
             {(() => { const m = project.media.find((x) => x.id === f.clip.mediaId); return m && (m.kind === 'video' || m.kind === 'audio'); })() && (
-              <button role="menuitem" onPointerDown={run(() => openCaptions(menu.clipId))}>
+              <button role="menuitem" onPointerDown={run(() => openCaptions(state.selection.length > 1 && state.selection.includes(menu.clipId) ? state.selection : menu.clipId))}>
                 <Icon name="captions" size={15} /> Gerar legendas…
               </button>
             )}

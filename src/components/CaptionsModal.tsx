@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useEditor } from '../editor-context';
 import { api, type CaptionsStatus } from '../api';
 import { addCaptionTrack, findClip } from '../ops';
 import { closeCaptions } from '../captions-ui';
-import { CAPTION_STYLES, DEFAULT_HIGHLIGHT, groupIntoPages, normalizeWordTimes, pagesToClips } from '../../shared/captions';
-import { clipSpeed, type CaptionStyle } from '../../shared/types';
+import { CAPTION_STYLES, DEFAULT_HIGHLIGHT, groupIntoPages, normalizeWordTimes, pagesToClips, planTranscription, speechClips, wordsToTimeline, type TimedWord } from '../../shared/captions';
+import type { CaptionStyle, Clip } from '../../shared/types';
 import { Segmented } from './Fields';
 
 const LANGS = [
@@ -25,7 +25,10 @@ const loadPrefs = (): Prefs => {
 
 type Phase = { k: 'setup' } | { k: 'running'; msg: string; progress: number; stage: string } | { k: 'error'; error: string };
 
-export const CaptionsModal: React.FC<{ clipId: string }> = ({ clipId }) => {
+type Scope = 'one' | 'sel' | 'all';
+const fmtSec = (s: number) => (s >= 90 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${s.toFixed(1).replace('.', ',')} s`);
+
+export const CaptionsModal: React.FC<{ ids: string[] }> = ({ ids }) => {
   const { state, commit, notify } = useEditor();
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [status, setStatus] = useState<CaptionsStatus | null>(null);
@@ -34,8 +37,16 @@ export const CaptionsModal: React.FC<{ clipId: string }> = ({ clipId }) => {
   useEffect(() => { api().captionsStatus().then(setStatus).catch(() => {}); }, []);
 
   const project = state.project;
-  const f = findClip(project, clipId);
-  const media = f ? project.media.find((m) => m.id === f.clip.mediaId) : undefined;
+  const fps = project.fps;
+  const isSound = (c: Clip) => { const m = project.media.find((x) => x.id === c.mediaId); return !!m && (m.kind === 'video' || m.kind === 'audio') && !c.text && !c.template && !c.lottie; };
+  const picked = useMemo(() => ids.map((id) => findClip(project, id)?.clip).filter((c): c is Clip => !!c && isSound(c)), [ids, project]); // eslint-disable-line react-hooks/exhaustive-deps
+  const all = useMemo(() => speechClips(project), [project]);
+  const scopes: { value: Scope; label: string; n: number }[] = [];
+  if (picked.length === 1) scopes.push({ value: 'one', label: 'Só este clip', n: 1 });
+  if (picked.length > 1) scopes.push({ value: 'sel', label: `Clips selecionados (${picked.length})`, n: picked.length });
+  if (all.length > 1 || !picked.length) scopes.push({ value: 'all', label: `Vídeo todo (${all.length} ${all.length === 1 ? 'clip' : 'clips'})`, n: all.length });
+  const [scope, setScope] = useState<Scope>(() => (picked.length > 1 ? 'sel' : all.length > 1 ? 'all' : 'one'));
+  const clips = scope === 'one' ? picked.slice(0, 1) : scope === 'sel' ? picked : all;
   const running = phase.k === 'running';
 
   useEffect(() => {
@@ -44,30 +55,51 @@ export const CaptionsModal: React.FC<{ clipId: string }> = ({ clipId }) => {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [running]);
 
-  if (!f || !media || media.kind === 'image') {
-    return null;
-  }
-  const clip = f.clip;
-  const fps = project.fps;
-  const sp = clipSpeed(clip);
-  const durSec = (clip.duration * sp) / fps;
+  // pedaços a transcrever, por ficheiro (cada ficheiro uma só vez, mesmo com muitos cortes)
+  const jobs = useMemo(() => {
+    const by = new Map<string, Clip[]>();
+    for (const c of clips) by.set(c.mediaId, [...(by.get(c.mediaId) ?? []), c]);
+    return [...by].flatMap(([mediaId, cs]) => {
+      const media = project.media.find((m) => m.id === mediaId)!;
+      return planTranscription(cs, fps, { mediaDurSec: media.durationSec }).map((r) => ({ media, clips: cs, ...r }));
+    });
+  }, [clips, project.media, fps]);
+
+  if (!clips.length) return null;
+  const totalSec = jobs.reduce((s, j) => s + j.durSec, 0);
+  const onTimeline = clips.reduce((s, c) => s + c.duration, 0) / fps;
+  const firstMedia = jobs[0]?.media;
 
   const start = async () => {
     try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* ignora */ }
     setPhase({ k: 'running', msg: 'A iniciar…', progress: 0, stage: 'start' });
-    const off = api().onCaptionsProgress((p) => setPhase({ k: 'running', msg: p.message, progress: p.progress, stage: p.stage }));
+    let done = 0, cur = jobs[0];
+    const off = api().onCaptionsProgress((p) => {
+      const part = jobs.length > 1 ? ` (parte ${jobs.indexOf(cur) + 1} de ${jobs.length})` : '';
+      setPhase({ k: 'running', msg: p.message + (p.stage === 'transcribe' ? part : ''), stage: p.stage, progress: p.stage === 'transcribe' ? (done + p.progress * cur.durSec) / totalSec : p.stage === 'download' ? p.progress : done / totalSec });
+    });
     try {
-      const r = await api().captionsStart({
-        file: media.path, startSec: clip.trimStart / fps, durSec, model: prefs.model,
-        language: prefs.language, // 'auto' tem de ir explícito: sem língua o Whisper assume inglês
-      });
-      if (r.canceled) { setPhase({ k: 'setup' }); return; }
-      if (!r.ok || !r.captions) { setPhase({ k: 'error', error: r.error || 'Erro desconhecido' }); return; }
-      const pages = groupIntoPages(normalizeWordTimes(r.captions));
-      if (!pages.length) { setPhase({ k: 'error', error: 'Não foi detetada fala neste clip.' }); return; }
-      const clips = pagesToClips(pages, { fps, startFrame: clip.start, speed: sp, style: prefs.style, highlight: prefs.highlight, endFrame: clip.start + clip.duration });
-      commit((p) => { const t = addCaptionTrack(p, clips); return { project: t.project, select: [clips[0].id] }; });
-      notify(`${clips.length} legendas criadas${r.language ? ` (${r.language})` : ''} — edita o texto clicando em cada uma`);
+      const words: TimedWord[] = [];
+      let lang: string | undefined;
+      for (const j of jobs) {
+        cur = j;
+        const r = await api().captionsStart({
+          file: j.media.path, startSec: j.startSec, durSec: j.durSec, model: prefs.model,
+          language: prefs.language, // 'auto' tem de ir explícito: sem língua o Whisper assume inglês
+        });
+        if (r.canceled) { setPhase({ k: 'setup' }); return; }
+        if (!r.ok || !r.captions) { setPhase({ k: 'error', error: r.error || 'Erro desconhecido' }); return; }
+        lang ??= r.language;
+        words.push(...wordsToTimeline(r.captions, j.startSec, j.clips, fps));
+        done += j.durSec;
+      }
+      words.sort((a, b) => a.startMs - b.startMs);
+      const pages = groupIntoPages(normalizeWordTimes(words));
+      if (!pages.length) { setPhase({ k: 'error', error: clips.length > 1 ? 'Não foi detetada fala nestes clips.' : 'Não foi detetada fala neste clip.' }); return; }
+      const endFrame = Math.max(...clips.map((c) => c.start + c.duration));
+      const caps = pagesToClips(pages, { fps, startFrame: 0, style: prefs.style, highlight: prefs.highlight, endFrame });
+      commit((p) => { const t = addCaptionTrack(p, caps); return { project: t.project, select: [caps[0].id] }; });
+      notify(`${caps.length} legendas criadas${lang ? ` (${lang})` : ''} — edita o texto clicando em cada uma`);
       closeCaptions();
     } finally { off(); }
   };
@@ -77,10 +109,17 @@ export const CaptionsModal: React.FC<{ clipId: string }> = ({ clipId }) => {
     <div className="modal-backdrop">
       <div className="modal captions-modal" role="dialog" aria-modal="true" aria-labelledby="cap-title">
         <h3 id="cap-title">Gerar legendas</h3>
-        <p className="path">{media.name} · {durSec.toFixed(1).replace('.', ',')} s</p>
+        <p className="path">{clips.length === 1 || new Set(clips.map((c) => c.mediaId)).size === 1 ? firstMedia?.name : `${new Set(clips.map((c) => c.mediaId)).size} ficheiros`} · {fmtSec(onTimeline)}{clips.length > 1 ? ` em ${clips.length} clips` : ''}</p>
 
         {phase.k === 'setup' && (
           <>
+            {scopes.length > 1 && (
+              <div className="field">
+                <span className="field-label">Legendar</span>
+                <Segmented label="Legendar" value={scope} onChange={setScope} options={scopes.map((x) => ({ value: x.value, label: x.label }))} />
+                {scope === 'all' && <span className="fmt-hint">Todos os clips de vídeo com som, numa só pista de legendas. Música e áudios soltos ficam de fora (para os incluir, seleciona-os).</span>}
+              </div>
+            )}
             <div className="exp-row">
               <label className="field">
                 <span className="field-label">Língua falada</span>

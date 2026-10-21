@@ -1,5 +1,6 @@
 // Legendas: agrupar palavras em frases curtas, criar clips de texto, retemporizar ao editar, SRT.
 import type { CaptionData, CaptionStyle, CaptionWord, Clip, TextContent } from './types';
+import { clipSourceSpan, relForSource } from './speedramp';
 
 export interface TimedWord { text: string; startMs: number; endMs: number }
 export interface CaptionPage { words: TimedWord[]; startMs: number; endMs: number }
@@ -187,4 +188,73 @@ export function sliceCaption(clip: Clip, from: number, to: number): Partial<Clip
     .map((w) => ({ ...w, s: Math.max(0, w.s - from), e: Math.max(1, w.e - from) }));
   if (!words.length) return { caption: { ...clip.caption, words: [] } };
   return { caption: { ...clip.caption, words }, text: { ...clip.text, text: words.map((w) => w.t).join(' ') } };
+}
+
+
+// ---------- Legendas para vários clips (vídeo com cortes) ----------
+
+/** Pedaço do ficheiro a transcrever */
+export interface TranscribeRange { startSec: number; durSec: number }
+
+/**
+ * Junta os excertos da fonte usados pelos clips (do mesmo ficheiro) em poucos pedaços a transcrever:
+ * excertos separados por menos de `maxGapSec` vão juntos (o Whisper arranca uma vez por pedaço).
+ */
+export function planTranscription(clips: Clip[], fps: number, o: { maxGapSec?: number; padSec?: number; mediaDurSec?: number } = {}): TranscribeRange[] {
+  const gap = o.maxGapSec ?? 20, pad = o.padSec ?? 0.3;
+  const iv = clips
+    .map((c) => [c.trimStart / fps, (c.trimStart + clipSourceSpan(c)) / fps] as [number, number])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const out: [number, number][] = [];
+  for (const [a, b] of iv) {
+    const last = out[out.length - 1];
+    if (last && a - last[1] < gap) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out.map(([a, b]) => {
+    const s = Math.max(0, a - pad);
+    const e = o.mediaDurSec ? Math.min(o.mediaDurSec, b + pad) : b + pad;
+    return { startSec: s, durSec: Math.max(0.1, e - s) };
+  });
+}
+
+/**
+ * Passa palavras transcritas de um pedaço da fonte (ms relativos a `offsetSec`) para a timeline:
+ * cada palavra aparece em cada clip que usa esse momento da fonte (pelo meio da palavra);
+ * palavras em partes cortadas desaparecem. Devolve ms absolutos da timeline.
+ */
+export function wordsToTimeline(words: TimedWord[], offsetSec: number, clips: Clip[], fps: number): TimedWord[] {
+  const out: TimedWord[] = [];
+  for (const w of words) {
+    const s = (offsetSec + w.startMs / 1000) * fps, e = (offsetSec + w.endMs / 1000) * fps;
+    const mid = (s + e) / 2;
+    for (const c of clips) {
+      if (relForSource(c, mid) === null) continue;
+      const lo = c.trimStart, hi = c.trimStart + clipSourceSpan(c);
+      const rs = relForSource(c, Math.min(hi, Math.max(lo, s)));
+      const re = relForSource(c, Math.min(hi, Math.max(lo, e)));
+      if (rs === null || re === null) continue;
+      const a = Math.min(c.duration, Math.max(0, rs)), b = Math.min(c.duration, Math.max(a, re));
+      out.push({ text: w.text, startMs: ((c.start + a) / fps) * 1000, endMs: ((c.start + b) / fps) * 1000 });
+    }
+  }
+  return out.sort((x, y) => x.startMs - y.startMs);
+}
+
+/** Clips com fala para "o vídeo todo": clips de vídeo (ou o seu som separado), sem duplicar */
+export function speechClips(p: { media: { id: string; kind: string }[]; tracks: { muted: boolean; clips: Clip[] }[] }, includeAudio = false): Clip[] {
+  const kind = new Map(p.media.map((m) => [m.id, m.kind]));
+  const out: Clip[] = [];
+  for (const t of p.tracks) {
+    if (t.muted) continue;
+    for (const c of t.clips) {
+      const k = kind.get(c.mediaId);
+      if (!(k === 'video' || (includeAudio && k === 'audio'))) continue;
+      if (c.audioDetached || c.reversed || c.text || c.template || c.lottie || c.sticker) continue;
+      if ((c.volume ?? 1) <= 0) continue;
+      out.push(c);
+    }
+  }
+  return out;
 }

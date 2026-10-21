@@ -3,6 +3,7 @@ import { useEditor } from '../editor-context';
 import { hasSound, TRANSITION_PREFIX, setLottieLoop, setTransition, canDetachAudio, changeFps, clipsAt, cutAtFrame, deleteClips, detachAudio, findClip, reattachAudio, splitClips, updateClip } from '../ops';
 import { playhead } from '../playhead';
 import { openCaptions } from '../captions-ui';
+import { speechClips } from '../../shared/captions';
 import { openProjectSettings } from '../project-settings-ui';
 import { aspectLabel } from '../../shared/aspect';
 import { timecode } from '../util';
@@ -71,6 +72,9 @@ export const Inspector: React.FC = () => {
         <header className="panel-head"><h2>{selection.length} clips</h2></header>
         <div className="inspector-body">
           <MultiAudioActions ids={selection} />
+          <button className="btn block cap-gen" title="Transcreve a fala dos clips selecionados e cria uma só pista de legendas" onClick={() => openCaptions(selection)}>
+            <Icon name="captions" size={16} /> Gerar legendas
+          </button>
           <button className="btn danger block" onClick={() => commit((p) => deleteClips(p, selection), [])}>
             <Icon name="trash" size={16} /> Apagar seleção
           </button>
@@ -88,6 +92,11 @@ export const Inspector: React.FC = () => {
           <button className="btn block" onClick={openProjectSettings} title="Formato, resolução, fps e fundo (Cmd+,)">
             <Icon name="settings" size={16} /> Modificar… <span className="btn-meta">{aspectLabel(project.width, project.height)} · {project.width}×{project.height}</span>
           </button>
+          {speechClips(project).length > 0 && (
+            <button className="btn block cap-gen" title="Transcreve a fala de todos os clips de vídeo e cria uma só pista de legendas" onClick={() => openCaptions([])}>
+              <Icon name="captions" size={16} /> Gerar legendas do vídeo
+            </button>
+          )}
           <Row label="Nome">
             <input
               type="text" value={project.name}
